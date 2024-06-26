@@ -6,11 +6,12 @@
 Servo turnTable;
 
 void setup() {
+  Serial.begin(115200);
   turnTable.attach(PIN_SERVO);
-
+  Serial.println("Hello world!");
   pattern1(turnTable);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop() 
+{
 }

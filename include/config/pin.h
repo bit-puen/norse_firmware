@@ -1,1 +1,1 @@
-#define PIN_SERVO   GPIO_NUM_5
+#define PIN_SERVO   GPIO_NUM_3
