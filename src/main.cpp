@@ -1,10 +1,57 @@
 #include <Arduino.h>
 #include <ESP32Servo.h>
 #include "config/pin.h"
-// #include "servo_pattern.h"
-// #define SERVO_DEG_PER_MS    0.857142857  // D2S51
-// #define SERVO_DEG_PER_MS    0.75  // D2S51
-// #define SERVO_DEG_PER_MS    0.923076923  // D2S51
+#include "CytronMotorDriver.h"
+
+
+CytronMD motor(PWM_DIR, PIN_DRIVER_PWM, PIN_DRIVER_DIR);
+uint8_t directionState = 0;
+uint8_t syringeState = 0;
+
+void setup() 
+{
+  Serial.begin(115200);
+  Serial.println("Hello world!");
+
+  pinMode(PIN_DIRECTION, INPUT);
+  pinMode(PIN_SYRINGE, INPUT);
+
+  delay(1000);
+
+  // motor.setSpeed(128);  // Run forward at 50% speed.
+  // delay(1000);
+  // motor.setSpeed(0);    // Stop.
+  // delay(1000);
+  // motor.setSpeed(-128);  // Run backward at 50% speed.
+  // delay(1000);
+  // motor.setSpeed(0);    // Stop.
+  // delay(1000);
+}
+
+void loop() 
+{
+  directionState = digitalRead(PIN_DIRECTION);
+  syringeState = digitalRead(PIN_SYRINGE);
+
+  Serial.printf("DIR: %d \t SYR: %d \r\n", directionState, syringeState);
+  
+  if (( directionState == HIGH ) && ( syringeState == HIGH ))
+  {
+    motor.setSpeed(-255);  // Run backward at 50% speed.
+  }
+  else if (( directionState == LOW ) && ( syringeState == HIGH ))
+  {
+    motor.setSpeed(32);  // Run forward at 50% speed.
+  }
+  else
+  {
+    motor.setSpeed(0);    // Stop.
+  }
+  
+  delay(50);
+}
+
+/*
 #define SERVO_DEG_PER_MS    1.2  // SG90
 #define SERVO_MAX_MSTIME    600
 #define SERVO_MID_MSTIME    1500
@@ -116,3 +163,4 @@ void pattern2()
   moveCcw90(222, 80); // +error
   delay(150);
 }
+*/
