@@ -1,6 +1,6 @@
 #include "dynamixel.h"
 
-Dynamixel::Dynamixel(PinName tx, PinName rx, int baudRate, PinName rs485DirectionPin): 
+Dynamixel::Dynamixel(PinName tx, PinName rx, uint32_t baudRate, PinName rs485DirectionPin): 
     _dynamixel(tx, rx), _rs485DirectionPin(rs485DirectionPin)
 {
     _baudRate = baudRate;

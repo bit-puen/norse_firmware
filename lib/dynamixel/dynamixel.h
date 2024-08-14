@@ -29,7 +29,7 @@
 class Dynamixel
 {
     public:
-        Dynamixel(PinName tx, PinName rx, int baudRate, PinName rs485DirectionPin);
+        Dynamixel(PinName tx, PinName rx, uint32_t baudRate, PinName rs485DirectionPin);
 
         void enableTorque(uint8_t id);
         void disableTorque(uint8_t id);
