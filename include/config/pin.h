@@ -1,5 +1,9 @@
-// #define PIN_SERVO           GPIO_NUM_3
-#define PIN_DRIVER_PWM      GPIO_NUM_9
-#define PIN_DRIVER_DIR      GPIO_NUM_8
-#define PIN_DIRECTION       GPIO_NUM_6
-#define PIN_SYRINGE         GPIO_NUM_7
+#ifndef CONFIG_PIN_H
+#define CONFIG_PIN_H
+
+#ifdef MK_I
+#define PIN_DYNAMIXEL_TX    PA_9
+#define PIN_DYNAMIXEL_RX    PA_10
+#endif
+
+#endif
