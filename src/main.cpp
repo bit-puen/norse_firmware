@@ -1,46 +1,31 @@
 #include "mbed.h"
 #include "norsebot.h"
-#include "norseprotocol.h"
 #include "config/pin.h"
+#include "config/instance.h"
 
-NorseProtocol nProtocol(USBTX, USBRX, 115200);
-NorsePacket nPacket;
-Thread readingThread;
 
-volatile bool readingThreadEnable = true;
+dynamixel_config_t dynamixelConfig{
+  PIN_DYNAMIXEL_TX,         /* Tx pin */ 
+  PIN_DYNAMIXEL_RX,         /* Rx pin */ 
+  PIN_DYNAMIXEL_DIRECTION,  /* Direction pin */ 
+  BUADRATE_PROTOCOL         /* Buad rate */ 
+};
+protocol_config_t protocolConfig{
+  PIN_PROTOCOL_TX,          /* Tx pin */ 
+  PIN_PROTOCOL_RX,          /* Rx pin */ 
+  BUADRATE_PROTOCOL         /* Buad rate */ 
+};
 
-// static BufferedSerial serial_port(USBTX, USBRX, 115200);
-
-// FileHandle *mbed::mbed_override_console(int fd)
-// {
-//   return &serial_port;
-// }
-
-void readMessage();
+NorseBot norseBot(&dynamixelConfig, &protocolConfig);
 
 int main()
 {
-  // nProtocol.runCommunication();
-  readingThread.start(readMessage);
+  norseBot.init();
 
   while (true)
   {
-    // printf("test\r\n");
     ThisThread::sleep_for(100ms);
   }
   
   return 0;
-}
-
-void readMessage() 
-{
-  while (readingThreadEnable) {
-    nProtocol.runCommunication();
-    // isPacketAvilable = mainBoard.getIsPacketAvilable();
-    if (nProtocol.getIsPacketAvilable()) 
-    {
-      nPacket = nProtocol.getPacket();
-    }
-    ThisThread::sleep_for(100ms);
-  }
 }
