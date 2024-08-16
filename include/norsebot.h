@@ -3,6 +3,7 @@
 
 #include "config/pin.h"
 #include "dynamixel.h"
+#include "norseprotocol.h"
 
 #ifdef MK_I
 #define WHEEL_FRONT_RIGHT_ID        1
@@ -24,22 +25,30 @@ typedef struct
 
 typedef struct
 {
+    PinName txPin;
+    PinName rxPin;
+    uint32_t baudRate;
+} protocol_config_t;
+
+typedef struct
+{
     float lengthWheelToCenterX;
     float lengthWheelToCenterY;
     float wheelDiameter;
 } norsebot_config_t;
 
-
-
 class NorseBot
 {
     public:
-        NorseBot(dynamixel_config_t *config);
+        NorseBot(dynamixel_config_t *configMotor, protocol_config_t *configProtocol);
         ~NorseBot();
+
+        void init();
 
         void startEngine();
         void stopEngine();
 
+        void stopMoving();
         void moveForward(uint16_t speed);
         void moveBackward(uint16_t speed);
         void moveLeft(uint16_t speed);
@@ -52,7 +61,15 @@ class NorseBot
         void moveTurnRight(uint16_t speed);
 
     private:
-        Dynamixel _motor;
+        Dynamixel* _motor;
+        NorseProtocol* _protocol;
+        NorsePacket _rxPacket;
+        Thread* _protocolThread;
+
+        volatile bool readingThreadRunning = false;
+
+        static void protocolThread(void const *pvParamter);
+        void protocolThreadWorker();
 };
 
 
