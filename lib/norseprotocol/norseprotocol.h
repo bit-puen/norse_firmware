@@ -14,7 +14,7 @@ typedef NorsePacket NorsePacket;
 class NorseProtocol
 {
     public:
-        NorseProtocol(PinName tx, PinName rx, uint64_t baudRate);
+        NorseProtocol(PinName tx, PinName rx, int baudRate);
         
         NorsePacket getPacket();
         bool getIsPacketAvilable();
@@ -32,7 +32,7 @@ class NorseProtocol
         uint8_t rxBuffer[MAXIMUM_BUFFER_SIZE];          // Not optimal size
         uint8_t txBuffer[MAXIMUM_BUFFER_SIZE];          // Not optimal size
         uint8_t parameters[MAXIMUM_BUFFER_SIZE/2];      // Not optimal size
-        uint16_t _baudRate;
+        int _baudRate;
 
         void read();
         void write();
