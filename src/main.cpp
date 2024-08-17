@@ -1,7 +1,7 @@
 #include "mbed.h"
 #include "norsebot.h"
 #include "config/pin.h"
-#include "config/instance.h"
+#include "config/constant .h"
 
 
 dynamixel_config_t dynamixelConfig{

@@ -6,7 +6,7 @@ NorseBot::NorseBot(dynamixel_config_t *configMotor, protocol_config_t *configPro
     _motor = new Dynamixel(configMotor->txPin, configMotor->rxPin, configMotor->baudRate, configMotor->directionPin);
     _protocol = new NorseProtocol(configProtocol->txPin, configProtocol->rxPin, configProtocol->baudRate);
     _protocolThread = new Thread(osPriorityNormal, 4096UL, nullptr, "ProtocolThread");
-}
+} 
 
 NorseBot::~NorseBot()
 {
@@ -14,12 +14,55 @@ NorseBot::~NorseBot()
 
 void NorseBot::init()
 {
-    // NorseProtocol norseProtocol;
     startEngine();
     readingThreadRunning = true;
-    // _protocolThread->start(mbed::callback(protocolThread, (void*)""));
-    // _protocolThread.start(mbed::callback(protocolThread, (void*)""));
     _protocolThread->start(mbed::callback(protocolThread, this));
+
+    registerControlMode = NBOT_REG_CMDMODE_MANUAL;
+    registerModeManualCommand = PARAM_MOVING_ST;
+    registerModeManualSpeed = 0;
+}
+
+void NorseBot::protocolHandler()
+{
+    switch (_rxPacket.eventId)
+    {
+        case EVENT_MOVING_CMD: 
+            registerModeManualCommand = _rxPacket.parameters[0];
+            registerModeManualSpeed = (((uint16_t)_rxPacket.parameters[2]) << 8) | (uint16_t)_rxPacket.parameters[1];
+            commandMovingHandler(); 
+            break;
+        default: break;
+    }
+}
+
+void NorseBot::commandMovingHandler()
+{
+    switch (registerControlMode)
+    {
+        case NBOT_REG_CMDMODE_MANUAL: manualModeHandler(); break;
+        case NBOT_REG_CMDMODE_AUTO: break;
+        default: break;
+    }
+}
+
+void NorseBot::manualModeHandler()
+{
+    switch (registerModeManualCommand)
+    {
+        case PARAM_MOVING_ST: stopMoving(); break;
+        case PARAM_MOVING_FW: moveForward(registerModeManualSpeed); break;
+        case PARAM_MOVING_BW: moveBackward(registerModeManualSpeed); break;
+        case PARAM_MOVING_RL: moveRotateLeft(registerModeManualSpeed); break;
+        case PARAM_MOVING_RR: moveRotateRight(registerModeManualSpeed); break;
+        case PARAM_MOVING_TL: moveForwardLeft(registerModeManualSpeed); break;
+        case PARAM_MOVING_TR: moveForwardRight(registerModeManualSpeed); break;
+        case PARAM_MOVING_FL: moveBackwardLeft(registerModeManualSpeed); break;
+        case PARAM_MOVING_FR: moveBackwardRight(registerModeManualSpeed); break;
+        case PARAM_MOVING_BL: moveTurnLeft(registerModeManualSpeed); break;
+        case PARAM_MOVING_BR: moveTurnRight(registerModeManualSpeed); break;
+        default: stopMoving(); break;
+    }
 }
 
 void NorseBot::startEngine()
@@ -62,7 +105,7 @@ void NorseBot::moveBackward(uint16_t speed)
     _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, speed, MOTOR_DIRECTION_BACKWARD);
 }
 
-void NorseBot::moveLeft(uint16_t speed)
+void NorseBot::moveRotateLeft(uint16_t speed)
 {
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
@@ -70,7 +113,7 @@ void NorseBot::moveLeft(uint16_t speed)
     _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, speed, MOTOR_DIRECTION_BACKWARD);
 }
 
-void NorseBot::moveRight(uint16_t speed)
+void NorseBot::moveRotateRight(uint16_t speed)
 {
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
@@ -135,13 +178,15 @@ void NorseBot::protocolThread(void const *pvParamter)
 
 void NorseBot::protocolThreadWorker()
 {
-    // printf("thread\r\n");
+    printf("thread\r\n");
     while (readingThreadRunning)
     {
         _protocol->runCommunication();
-        if (_protocol->getIsPacketAvilable())
+        isPacketAvilable = _protocol->getIsPacketAvilable();
+        if (isPacketAvilable)
         {
             _rxPacket = _protocol->getPacket();
+            protocolHandler();
         }
         ThisThread::sleep_for(1ms);
     }
