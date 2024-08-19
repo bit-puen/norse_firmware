@@ -56,14 +56,14 @@ class NorseBot
         void stopMoving();
         void moveForward(uint16_t speed);
         void moveBackward(uint16_t speed);
-        void moveRotateLeft(uint16_t speed);
-        void moveRotateRight(uint16_t speed);
+        void moveStraightLeft(uint16_t speed);
+        void moveStraightRight(uint16_t speed);
         void moveForwardLeft(uint16_t speed);
         void moveForwardRight(uint16_t speed);
         void moveBackwardLeft(uint16_t speed);
         void moveBackwardRight(uint16_t speed);
-        void moveTurnLeft(uint16_t speed);
-        void moveTurnRight(uint16_t speed);
+        void moveRotateLeft(uint16_t speed);
+        void moveRotateRight(uint16_t speed);
 
     private:
         Dynamixel* _motor;

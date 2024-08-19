@@ -24,10 +24,10 @@
 #define PARAM_MOVING_ST         0x00
 #define PARAM_MOVING_FW         0x01
 #define PARAM_MOVING_BW         0x02
-#define PARAM_MOVING_RL         0x03
-#define PARAM_MOVING_RR         0X04
-#define PARAM_MOVING_TL         0X05
-#define PARAM_MOVING_TR         0X06
+#define PARAM_MOVING_SL         0x03
+#define PARAM_MOVING_SR         0X04
+#define PARAM_MOVING_RL         0X05
+#define PARAM_MOVING_RR         0X06
 #define PARAM_MOVING_FL         0X07
 #define PARAM_MOVING_FR         0X08
 #define PARAM_MOVING_BL         0X09
