@@ -31,9 +31,16 @@ void NorseProtocol::runCommunication()
     }
 }
 
-void NorseProtocol::noticError(uint8_t reasonCode)
+void NorseProtocol::respondError(uint8_t reasonCode)
 {
     uint8_t data[] = {reasonCode};
+    generatePacket(EVENT_RESPONSE_ERROR, data, 1);
+    write();
+}
+
+void NorseProtocol::respondOk(uint8_t eventId)
+{
+    uint8_t data[] = {eventId};
     generatePacket(EVENT_RESPONSE_ERROR, data, 1);
     write();
 }
@@ -88,7 +95,7 @@ void NorseProtocol::read()
         // 2. Check header (start byte and protocol version)
         if (!validateHeader()) 
         {
-            noticError(ERR_HEADER);
+            respondError(ERR_HEADER);
             isError = true;
             // printf("Header error \r\n");
         }
@@ -96,7 +103,7 @@ void NorseProtocol::read()
         // 3. Validate checksum
         if (!validateChecksum(rxBuffer, bytes)) 
         {
-            noticError(ERR_CHECKSUM);
+            respondError(ERR_CHECKSUM);
             isError = true;
             // printf("Checksum error \r\n");
         }

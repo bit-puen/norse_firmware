@@ -18,7 +18,8 @@ class NorseProtocol
         bool getIsPacketAvilable();
         void runCommunication();
 
-        void noticError(uint8_t reasonCode);
+        void respondError(uint8_t reasonCode);
+        void respondOk(uint8_t eventId);
 
     private:
         void respondEventPing();

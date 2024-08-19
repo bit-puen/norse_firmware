@@ -67,6 +67,10 @@ void NorseBot::manualModeHandler()
 
 void NorseBot::startEngine()
 {
+    _motor->enableLed(WHEEL_FRONT_RIGHT_ID);
+    _motor->enableLed(WHEEL_FRONT_LEFT_ID);
+    _motor->enableLed(WHEEL_REAR_LEFT_ID);
+    _motor->enableLed(WHEEL_REAR_RIGHT_ID);
     _motor->enableTorque(WHEEL_FRONT_RIGHT_ID);
     _motor->enableTorque(WHEEL_FRONT_LEFT_ID);
     _motor->enableTorque(WHEEL_REAR_LEFT_ID);
@@ -75,6 +79,10 @@ void NorseBot::startEngine()
 
 void NorseBot::stopEngine()
 {
+    _motor->disableLed(WHEEL_FRONT_RIGHT_ID);
+    _motor->disableLed(WHEEL_FRONT_LEFT_ID);
+    _motor->disableLed(WHEEL_REAR_LEFT_ID);
+    _motor->disableLed(WHEEL_REAR_RIGHT_ID);
     _motor->disableTorque(WHEEL_FRONT_RIGHT_ID);
     _motor->disableTorque(WHEEL_FRONT_LEFT_ID);
     _motor->disableTorque(WHEEL_REAR_LEFT_ID);
@@ -83,14 +91,16 @@ void NorseBot::stopEngine()
 
 void NorseBot::stopMoving()
 {
-    _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, 0, MOTOR_DIRECTION_FORWARD);
-    _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, 0, MOTOR_DIRECTION_FORWARD);
-    _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, 0, MOTOR_DIRECTION_FORWARD);
-    _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, 0, MOTOR_DIRECTION_FORWARD);
+    _protocol->respondOk(EVENT_MOVING_CMD);
+    _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, 0, MOTOR_DIRECTION_BACKWARD);
+    _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, 0, MOTOR_DIRECTION_BACKWARD);
+    _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, 0, MOTOR_DIRECTION_BACKWARD);
+    _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, 0, MOTOR_DIRECTION_BACKWARD);
 }
 
 void NorseBot::moveForward(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
@@ -99,6 +109,7 @@ void NorseBot::moveForward(uint16_t speed)
 
 void NorseBot::moveBackward(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
@@ -107,6 +118,7 @@ void NorseBot::moveBackward(uint16_t speed)
 
 void NorseBot::moveRotateLeft(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
@@ -115,6 +127,7 @@ void NorseBot::moveRotateLeft(uint16_t speed)
 
 void NorseBot::moveRotateRight(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
@@ -123,6 +136,7 @@ void NorseBot::moveRotateRight(uint16_t speed)
 
 void NorseBot::moveForwardLeft(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, 0, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
@@ -131,6 +145,7 @@ void NorseBot::moveForwardLeft(uint16_t speed)
 
 void NorseBot::moveForwardRight(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, 0, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, 0, MOTOR_DIRECTION_BACKWARD);
@@ -139,6 +154,7 @@ void NorseBot::moveForwardRight(uint16_t speed)
 
 void NorseBot::moveBackwardLeft(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, 0, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
@@ -147,6 +163,7 @@ void NorseBot::moveBackwardLeft(uint16_t speed)
 
 void NorseBot::moveBackwardRight(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, 0, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, 0, MOTOR_DIRECTION_BACKWARD);
@@ -155,6 +172,7 @@ void NorseBot::moveBackwardRight(uint16_t speed)
 
 void NorseBot::moveTurnLeft(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, MOTOR_DIRECTION_BACKWARD);
@@ -163,6 +181,7 @@ void NorseBot::moveTurnLeft(uint16_t speed)
 
 void NorseBot::moveTurnRight(uint16_t speed)
 {
+    _protocol->respondOk(EVENT_MOVING_CMD);
     _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, MOTOR_DIRECTION_BACKWARD);
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, MOTOR_DIRECTION_FORWARD);
