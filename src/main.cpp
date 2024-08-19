@@ -8,7 +8,7 @@ dynamixel_config_t dynamixelConfig{
   PIN_DYNAMIXEL_TX,         /* Tx pin */ 
   PIN_DYNAMIXEL_RX,         /* Rx pin */ 
   PIN_DYNAMIXEL_DIRECTION,  /* Direction pin */ 
-  BUADRATE_PROTOCOL         /* Buad rate */ 
+  BUADRATE_DYNAMIXEL        /* Buad rate */ 
 };
 protocol_config_t protocolConfig{
   PIN_PROTOCOL_TX,          /* Tx pin */ 
@@ -20,6 +20,7 @@ NorseBot norseBot(&dynamixelConfig, &protocolConfig);
 
 int main()
 {
+  ThisThread::sleep_for(2s);
   norseBot.init();
 
   while (true)
