@@ -41,7 +41,7 @@ void NorseProtocol::respondError(uint8_t reasonCode)
 void NorseProtocol::respondOk(uint8_t eventId)
 {
     uint8_t data[] = {eventId};
-    generatePacket(EVENT_RESPONSE_ERROR, data, 1);
+    generatePacket(EVENT_RESPONSE_OK, data, 1);
     write();
 }
 
