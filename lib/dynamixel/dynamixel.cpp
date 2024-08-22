@@ -10,13 +10,14 @@ Dynamixel::Dynamixel(PinName tx, PinName rx, uint32_t baudRate, PinName rs485Dir
         /* parity */ BufferedSerial::None,
         /* stop bit */ 1
     );
+    _responseTimeoutMicroSec = DEFAULT_RESP_TIMEOUT_US;
 }
 
 void Dynamixel::enableTorque(uint8_t id)
 {
     uint8_t data[1];
     data[0] = 1;
-    write(id, REG_TORQUE_ENABLE, 1, data);
+    writeRegister(id, REG_TORQUE_ENABLE, 1, data);
     wait_us(DELAY_TIME_US);
 }
 
@@ -24,7 +25,7 @@ void Dynamixel::disableTorque(uint8_t id)
 {
     uint8_t data[1];
     data[0] = 0;
-    write(id, REG_TORQUE_ENABLE, 1, data);
+    writeRegister(id, REG_TORQUE_ENABLE, 1, data);
     wait_us(DELAY_TIME_US);
 }
 
@@ -32,7 +33,7 @@ void Dynamixel::enableLed(uint8_t id)
 {
     uint8_t data[1];
     data[0] = 1;
-    write(id, REG_LED_ENABLE, 1, data);
+    writeRegister(id, REG_LED_ENABLE, 1, data);
     wait_us(DELAY_TIME_US);
 }
 
@@ -40,7 +41,7 @@ void Dynamixel::disableLed(uint8_t id)
 {
     uint8_t data[1];
     data[0] = 0;
-    write(id, REG_LED_ENABLE, 1, data);
+    writeRegister(id, REG_LED_ENABLE, 1, data);
     wait_us(DELAY_TIME_US);
 }
 
@@ -55,15 +56,41 @@ void Dynamixel::setGoalVelocity(uint8_t id, uint16_t goalVelocity, uint8_t direc
     velocity[2] = first_bit;
     velocity[3] = first_bit;
 
-    write(id, REG_GOAL_VELOCITY, 4, velocity);
+    writeRegister(id, REG_GOAL_VELOCITY, 4, velocity);
     wait_us(DELAY_TIME_US);
 }
 
-void Dynamixel::write(uint8_t id, uint16_t registerAddress, uint16_t n_params, uint8_t *data)
+int Dynamixel::getPresentPosition(uint8_t id)
+{
+    int presentPosition;
+    StatusCode packetStatus;
+
+    packetStatus = readRegister(id, REG_PRESENT_POSITION, LEN_PRESENT_POSITION, presentPosition);
+    
+    if (packetStatus != packetResultOk)
+    {
+        while (packetStatus != packetResultOk)
+        {
+            packetStatus = readRegister(id, REG_PRESENT_POSITION, LEN_PRESENT_POSITION, presentPosition);
+        }
+    }
+
+    // printf("presentPosition: %d \r\n", presentPosition);
+    return presentPosition;
+}
+
+StatusCode Dynamixel::writeRegister(uint8_t id, uint16_t registerAddress, uint16_t n_params, uint8_t *data)
+{
+    write(id, INSTRUCTION_WRITE_DATA, registerAddress, n_params, data);
+    return read(0);
+}
+
+void Dynamixel::write(uint8_t id, uint8_t instruction, uint16_t registerAddress, uint16_t n_params, uint8_t *data)
 {
     // 0xff, 0xff, 0xfd, 0x00, ID, Len_L, Len_H, Instruction, Address, Param(s), CRC_L, CRC_H
     // length = n_params + 3 (Instruction: 1byte, CRC: 2bytes)
     // n_params = n_params + 2 (registerAddress: 2bytes)
+    uint16_t txDelayTimeMicroSec;
     uint8_t length = n_params + 5;
     uint8_t txBuffer[length + 7];
     unsigned short crc = 0;
@@ -75,7 +102,7 @@ void Dynamixel::write(uint8_t id, uint16_t registerAddress, uint16_t n_params, u
     txBuffer[4] = id;                  // Packet ID
     txBuffer[5] = length & 0xff;       // Len_L // bottom 8 bits //Packet Length = number of Parameters + 3
     txBuffer[6] = length >> 8;         // Len_H // top 8 bits //
-    txBuffer[7] = WRITE_DATA;          // Instruction
+    txBuffer[7] = instruction;          // Instruction
     txBuffer[8] = registerAddress & 0xff;      // Address L
     txBuffer[9] = registerAddress >> 8;        // Address H
 
@@ -88,21 +115,122 @@ void Dynamixel::write(uint8_t id, uint16_t registerAddress, uint16_t n_params, u
     txBuffer[10+n_params] = crc & 0x00ff;         // CRC_L // CRC_L = (CRC & 0x00FF);
     txBuffer[11+n_params] = (crc >> 8) & 0x00ff;  // CRC_H // first dummy //
 
+    // Debug
+    /* 
+    printf("TX: ");
+    for (uint8_t i = 0; i < length + 7; i++)
+    {
+        printf("%d ", txBuffer[i]);
+    }
+    printf("\r\n");
+    */
+
     //send Instruction Packet
-    wait_us(1000); //wait for 74HC126 enable pin transition delay  
+    // wait_us(1000); //wait for 74HC126 enable pin transition delay  
     _rs485DirectionPin = 1;
-
-    // Transmit the packet in one burst with no pausing
-    // for (int i = 0; i < (length + 7) ; i++) {
-    //     // _dynamixels.putc(txBuffer[i]);
-    //     _dynamixel.write();
-    // }
-    // _dynamixel.write(txBuffer, sizeof(uint8_t) * lengthTxBuffer);
-    _dynamixel.write(txBuffer, sizeof(uint8_t) * (length + 7));
-
+    // _dynamixel.write(txBuffer, sizeof(uint8_t) * (length + 7));
+    _dynamixel.write(txBuffer, sizeof(txBuffer));
     // Wait for data to transmit
-    wait_us(20);
+    txDelayTimeMicroSec = (sizeof(uint8_t) * (length + 7) * 8 * 1) + DELAY_TX_OFFSET_US;
+    wait_us(txDelayTimeMicroSec);
+    // wait_us(110);
     _rs485DirectionPin = 0;
+}
+
+StatusCode Dynamixel::readRegister(uint8_t id, uint16_t registerAddress, uint16_t bytes, int& data)
+{
+    uint8_t params[2];
+    // data[0] = registerAddress & 0xff;
+    // data[1] = registerAddress >> 8;
+    params[0] = bytes & 0xff;
+    params[1] = bytes >> 8;
+    write(id, INSTRUCTION_READ_DATA, registerAddress, 2, params);
+    // printf("StatusCode: %d\r\n", read(bytes, data));
+    return read(bytes, data);
+}
+
+StatusCode Dynamixel::read(uint16_t bytesStuatusParams)
+{
+    int dummyData;
+    return read(bytesStuatusParams, dummyData);
+}
+
+StatusCode Dynamixel::read(uint16_t bytesStuatusParams, int& data)
+{
+    // Timer timeoutTimer;
+    // uint8_t counterBuffer = 0;
+    // uint8_t tmpBuffer[bytesStuatusParams + 11];
+    uint8_t rxBuffer[bytesStuatusParams + 11];
+    uint16_t packetLength;
+    uint8_t readBytesNumber;
+    // [Header1][Header2][Header3][Reserved][PacketID][Length1][Length2][Instruction][ERR][CRC1][CRC2]
+    // uint16_t lenPacket = 11 + bytesStuatusParams;
+
+    // timeoutTimer.start();
+    // while ((timeoutTimer.read_us() < _responseTimeoutMicroSec) && _dynamixel.readable())
+    // {
+    readBytesNumber = _dynamixel.read(rxBuffer, sizeof(rxBuffer));
+        // printf("%d ", readBytesNumber);
+        // if (readBytesNumber)
+        // {
+        //     rxBuffer[counterBuffer] = tmpBuffer[0];
+        //     counterBuffer++;
+        //     timeoutTimer.reset();
+        // }
+    // }
+    // timeoutTimer.stop();
+
+    // Debug
+    /* 
+    printf("RX: ");
+    for (size_t i = 0; i < readBytesNumber; i++)
+    {
+        printf("%d ", rxBuffer[i]);
+    }
+    printf("\r\n");
+    */
+
+    // validate header
+    if (rxBuffer[0] != 0xFF && rxBuffer[1] != 0xFF && rxBuffer[2] != 0xFD)
+    {
+        data = 0;
+        return packetResultFail;
+    }
+
+    packetLength = (((uint16_t)rxBuffer[6]) << 8) | (uint16_t)rxBuffer[5];
+    if ((packetLength + 7) > readBytesNumber)
+    {
+        data = 0;
+        return packetDataLengthError;
+    }
+
+    if (rxBuffer[8] != packetResultOk)
+    {
+        data = 0;
+        return StatusCode(rxBuffer[8]);
+    }
+    
+    
+    switch (bytesStuatusParams)
+    {
+    case 0:
+        data = 0;
+        break;
+    case 1:
+        data = (uint16_t)rxBuffer[9];
+        break;
+    case 2:
+        data = (((uint16_t)rxBuffer[10]) << 8) | (uint16_t)rxBuffer[9];
+        break;
+    case 4:
+        data = (((uint16_t)rxBuffer[12]) << 24) | (((uint16_t)rxBuffer[11]) << 16) | (((uint16_t)rxBuffer[10]) << 8) | (uint16_t)rxBuffer[9];
+        break;
+    default:
+        data = 0;
+        break;
+    }
+    return StatusCode(rxBuffer[8]);
+
 }
 
 unsigned short Dynamixel::update_crc(unsigned short crc_accum, unsigned char *data_blk_prt, unsigned short data_blk_size)
@@ -151,3 +279,5 @@ unsigned short Dynamixel::update_crc(unsigned short crc_accum, unsigned char *da
 
     return crc_accum;
 }
+
+
