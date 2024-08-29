@@ -45,6 +45,19 @@ void Dynamixel::disableLed(uint8_t id)
     wait_us(DELAY_TIME_US);
 }
 
+void Dynamixel::setGoalVelocity(uint8_t id, int goalVelocity)
+{
+    uint8_t velocity[4];
+
+    velocity[0] = goalVelocity & 0xff;
+    velocity[1] = (goalVelocity >> 8) & 0xff;
+    velocity[3] = (goalVelocity >> 16) & 0xff;
+    velocity[4] = goalVelocity >> 24;
+
+    writeRegister(id, REG_GOAL_VELOCITY, 4, velocity);
+    wait_us(DELAY_TIME_US);
+}
+
 void Dynamixel::setGoalVelocity(uint8_t id, uint16_t goalVelocity, uint8_t direction)
 {
     uint8_t velocity[4];
@@ -62,21 +75,40 @@ void Dynamixel::setGoalVelocity(uint8_t id, uint16_t goalVelocity, uint8_t direc
 
 int Dynamixel::getPresentPosition(uint8_t id)
 {
+    // Timer timeoutTimer;
     int presentPosition;
     StatusCode packetStatus;
+    // uint8_t recursiveCount = 0;
 
     packetStatus = readRegister(id, REG_PRESENT_POSITION, LEN_PRESENT_POSITION, presentPosition);
     
-    if (packetStatus != packetResultOk)
-    {
-        while (packetStatus != packetResultOk)
-        {
-            packetStatus = readRegister(id, REG_PRESENT_POSITION, LEN_PRESENT_POSITION, presentPosition);
-        }
-    }
+    // if (packetStatus != packetResultOk)
+    // {
+    //     // timeoutTimer.start();
+    //     // packetStatus = readRegister(id, REG_PRESENT_POSITION, LEN_PRESENT_POSITION, presentPosition);
+    //     // while (packetStatus != packetResultOk && timeoutTimer.read_us() < 500)
+    //     // while (packetStatus != packetResultOk && recursiveCount < 10)
+    //     // {
+    //     //     packetStatus = readRegister(id, REG_PRESENT_POSITION, LEN_PRESENT_POSITION, presentPosition);
+    //     //     printf("fail: %d\r\n", packetStatus);
+    //     //     recursiveCount++;
+    //     // }
+    //     // timeoutTimer.stop();
+    // }
 
     // printf("presentPosition: %d \r\n", presentPosition);
+    wait_us(DELAY_TIME_US);
     return presentPosition;
+}
+
+int Dynamixel::getPresentVelocity(uint8_t id)
+{
+    int presentVelocity;
+    StatusCode packetStatus;
+    packetStatus = readRegister(id, REG_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY, presentVelocity);
+    printf("presentVelocity: %d\r\n", presentVelocity);
+    wait_us(DELAY_TIME_US);
+    return presentVelocity;
 }
 
 StatusCode Dynamixel::writeRegister(uint8_t id, uint16_t registerAddress, uint16_t n_params, uint8_t *data)
@@ -95,16 +127,16 @@ void Dynamixel::write(uint8_t id, uint8_t instruction, uint16_t registerAddress,
     uint8_t txBuffer[length + 7];
     unsigned short crc = 0;
 
-    txBuffer[0] = 0xff;                // Header1
-    txBuffer[1] = 0xff;                // Header2
-    txBuffer[2] = 0xfd;                // Header3
-    txBuffer[3] = 0x00;                // Reserved
-    txBuffer[4] = id;                  // Packet ID
-    txBuffer[5] = length & 0xff;       // Len_L // bottom 8 bits //Packet Length = number of Parameters + 3
-    txBuffer[6] = length >> 8;         // Len_H // top 8 bits //
-    txBuffer[7] = instruction;          // Instruction
-    txBuffer[8] = registerAddress & 0xff;      // Address L
-    txBuffer[9] = registerAddress >> 8;        // Address H
+    txBuffer[0] = 0xFF;                     // Header1
+    txBuffer[1] = 0xFF;                     // Header2
+    txBuffer[2] = 0xFD;                     // Header3
+    txBuffer[3] = 0x00;                     // Reserved
+    txBuffer[4] = id;                       // Packet ID
+    txBuffer[5] = length & 0xFF;            // Len_L // bottom 8 bits //Packet Length = number of Parameters + 3
+    txBuffer[6] = length >> 8;              // Len_H // top 8 bits //
+    txBuffer[7] = instruction;              // Instruction
+    txBuffer[8] = registerAddress & 0xFF;   // Address L
+    txBuffer[9] = registerAddress >> 8;     // Address H
 
     for (int i=0; i<n_params ; i++) {
         txBuffer[10+i] = data[i];
@@ -126,12 +158,13 @@ void Dynamixel::write(uint8_t id, uint8_t instruction, uint16_t registerAddress,
     */
 
     //send Instruction Packet
-    // wait_us(1000); //wait for 74HC126 enable pin transition delay  
     _rs485DirectionPin = 1;
-    // _dynamixel.write(txBuffer, sizeof(uint8_t) * (length + 7));
+    //wait for 74HC241 enable pin transition delay  
+    // 5 microsec estimated by oscilloscope @puen
+    wait_us(5);
     _dynamixel.write(txBuffer, sizeof(txBuffer));
     // Wait for data to transmit
-    txDelayTimeMicroSec = (sizeof(uint8_t) * (length + 7) * 8 * 1) + DELAY_TX_OFFSET_US;
+    txDelayTimeMicroSec = int((sizeof(uint8_t) * (length + 7) * 8 * 1.2) * (1000000 / _baudRate)) + DELAY_TX_OFFSET_US;
     wait_us(txDelayTimeMicroSec);
     // wait_us(110);
     _rs485DirectionPin = 0;
@@ -140,12 +173,11 @@ void Dynamixel::write(uint8_t id, uint8_t instruction, uint16_t registerAddress,
 StatusCode Dynamixel::readRegister(uint8_t id, uint16_t registerAddress, uint16_t bytes, int& data)
 {
     uint8_t params[2];
-    // data[0] = registerAddress & 0xff;
-    // data[1] = registerAddress >> 8;
-    params[0] = bytes & 0xff;
+    params[0] = bytes & 0xFF;
     params[1] = bytes >> 8;
+
     write(id, INSTRUCTION_READ_DATA, registerAddress, 2, params);
-    // printf("StatusCode: %d\r\n", read(bytes, data));
+
     return read(bytes, data);
 }
 
@@ -161,8 +193,8 @@ StatusCode Dynamixel::read(uint16_t bytesStuatusParams, int& data)
     // uint8_t counterBuffer = 0;
     // uint8_t tmpBuffer[bytesStuatusParams + 11];
     uint8_t rxBuffer[bytesStuatusParams + 11];
-    uint16_t packetLength;
     uint8_t readBytesNumber;
+    uint16_t packetLength;
     // [Header1][Header2][Header3][Reserved][PacketID][Length1][Length2][Instruction][ERR][CRC1][CRC2]
     // uint16_t lenPacket = 11 + bytesStuatusParams;
 
@@ -181,14 +213,20 @@ StatusCode Dynamixel::read(uint16_t bytesStuatusParams, int& data)
     // timeoutTimer.stop();
 
     // Debug
-    /* 
+    /*
+    timeoutTimer.start();
     printf("RX: ");
     for (size_t i = 0; i < readBytesNumber; i++)
     {
         printf("%d ", rxBuffer[i]);
     }
-    printf("\r\n");
+    timeoutTimer.stop();
+    printf(" Time: %llu\r\n", timeoutTimer.elapsed_time().count());
     */
+
+   // wait for storing buffer 
+   // 200 microsec estimated by oscilloscope @puen
+   wait_us(200); 
 
     // validate header
     if (rxBuffer[0] != 0xFF && rxBuffer[1] != 0xFF && rxBuffer[2] != 0xFD)
@@ -197,6 +235,7 @@ StatusCode Dynamixel::read(uint16_t bytesStuatusParams, int& data)
         return packetResultFail;
     }
 
+    // check packet length
     packetLength = (((uint16_t)rxBuffer[6]) << 8) | (uint16_t)rxBuffer[5];
     if ((packetLength + 7) > readBytesNumber)
     {
@@ -204,12 +243,12 @@ StatusCode Dynamixel::read(uint16_t bytesStuatusParams, int& data)
         return packetDataLengthError;
     }
 
+    // check status packet byte
     if (rxBuffer[8] != packetResultOk)
     {
         data = 0;
         return StatusCode(rxBuffer[8]);
     }
-    
     
     switch (bytesStuatusParams)
     {
@@ -230,7 +269,6 @@ StatusCode Dynamixel::read(uint16_t bytesStuatusParams, int& data)
         break;
     }
     return StatusCode(rxBuffer[8]);
-
 }
 
 unsigned short Dynamixel::update_crc(unsigned short crc_accum, unsigned char *data_blk_prt, unsigned short data_blk_size)

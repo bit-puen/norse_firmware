@@ -14,8 +14,9 @@ enum StatusCode
 };
 
 ////////// VARIABLE ///////////
-#define DELAY_TIME_US               3000
-#define DELAY_TX_OFFSET_US          6
+#define DELAY_TIME_US               2000
+// #define DELAY_TX_OFFSET_US          6
+#define DELAY_TX_OFFSET_US          140
 #define DEFAULT_RESP_TIMEOUT_US     4000  // Estimate from oscilloscope @puen
 
 class Dynamixel
@@ -27,8 +28,11 @@ class Dynamixel
         void disableTorque(uint8_t id);
         void enableLed(uint8_t id);
         void disableLed(uint8_t id);
-        void setGoalVelocity(uint8_t id,uint16_t goalVelocity, uint8_t direction);
+        void setGoalVelocity(uint8_t id, int goalVelocity);
+        void setGoalVelocity(uint8_t id, uint16_t goalVelocity, uint8_t direction);
+        
         int getPresentPosition(uint8_t id);
+        int getPresentVelocity(uint8_t id);
 
     private:
         BufferedSerial _dynamixel;

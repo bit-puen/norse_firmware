@@ -20,12 +20,13 @@ NorseBot norseBot(&dynamixelConfig, &protocolConfig);
 
 int main()
 {
-  ThisThread::sleep_for(2s);
   norseBot.init();
+  ThisThread::sleep_for(2s);
 
   while (true)
   {
-    ThisThread::sleep_for(100ms);
+    norseBot.updateMotorPosition();
+    ThisThread::sleep_for(500ms);
   }
   
   return 0;
