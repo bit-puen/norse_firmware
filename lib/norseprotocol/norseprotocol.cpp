@@ -1,7 +1,8 @@
 #include "norseprotocol.h"
 
-NorseProtocol::NorseProtocol(PinName tx, PinName rx, int baudRate):
-    _uart(tx, rx)
+#if defined(MK_I) || defined(MK_II)
+NorseProtocol::NorseProtocol(PinName tx, PinName rx, int baudRate)
+    : _uart(tx, rx)
 {
     _baudRate = baudRate;
     _uart.set_baud(_baudRate);
@@ -12,7 +13,19 @@ NorseProtocol::NorseProtocol(PinName tx, PinName rx, int baudRate):
     );
 }
 
-NorsePacket NorseProtocol::getPacket()
+#elif defined(MK_III)
+NorseProtocol::NorseProtocol(HardwareSerial &serialPort, uint32_t baudRate)
+    : _uart(serialPort), _baudRate(baudRate)
+{   
+}
+#endif
+
+void NorseProtocol::begin()
+{
+    _uart.begin(_baudRate);
+}
+
+norse_packet_t NorseProtocol::getPacket()
 {
     return _packet;
 }
@@ -61,6 +74,7 @@ void NorseProtocol::read()
     uint8_t bytes;
 
     // 1. Get data to buffer
+    #if PTC_MAJOR_VER == 1
     while (_uart.readable()) 
     {
         if (uint8_t readBytesNumber = _uart.read(tmpBuffer, sizeof(tmpBuffer))) 
@@ -84,6 +98,31 @@ void NorseProtocol::read()
             }
         }
     }
+    #elif defined(MK_III)
+    while (_uart.available()) 
+    {
+        if (uint8_t readBytesNumber = _uart.read(tmpBuffer, sizeof(tmpBuffer))) 
+        {
+            // _uart.write(tmpBuffer, readBytesNumber);
+
+            if (tmpBuffer[0] == '\r' || tmpBuffer[0] == STOP_BYTE_1) 
+            {
+                isGetReturnChar = true;
+            }
+            else if ((tmpBuffer[0] == '\n' || tmpBuffer[0] == STOP_BYTE_2) && isGetReturnChar) 
+            {
+                isEnding = true;
+                isGetReturnChar = false;
+            }
+            else 
+            {
+                rxBuffer[counter] = tmpBuffer[0];
+                counter++;
+                isGetReturnChar = false;
+            }
+        }
+    }
+    #endif
     
     // if (counter) {
     if (counter && isEnding) 
@@ -97,7 +136,7 @@ void NorseProtocol::read()
         {
             respondError(ERR_HEADER);
             isError = true;
-            // printf("Header error \r\n");
+             _uart.write("Header error \r\n");
         }
 
         // 3. Validate checksum
@@ -105,12 +144,13 @@ void NorseProtocol::read()
         {
             respondError(ERR_CHECKSUM);
             isError = true;
-            // printf("Checksum error \r\n");
+             _uart.write("Checksum error \r\n");
         }
 
         // 4. Create packet
         if (!isError) 
         {
+            // _uart.write(rxBuffer, counter);
             _packet.length = rxBuffer[2];
             _packet.eventId = rxBuffer[3];
             for (int i=0; i<(bytes-2); i++) 
@@ -121,6 +161,7 @@ void NorseProtocol::read()
         }
         else 
         {
+             _uart.write("Packet error \r\n");
             isPacketAvilable = false;
         }
         isReading = false;
@@ -205,10 +246,12 @@ bool NorseProtocol::validateHeader()
     return false;
 }
 
+#if defined(MK_I) || defined(MK_II)
 FileHandle *NorseProtocol::mbed_override_console(int fd)
 {
     return &_uart;
 }
+#endif
 
 void NorseProtocol::eventHandler()
 {

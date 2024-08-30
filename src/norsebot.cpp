@@ -1,11 +1,16 @@
 #include "norsebot.h"
 
 
-NorseBot::NorseBot(dynamixel_config_t *configMotor, protocol_config_t *configProtocol)
+// NorseBot::NorseBot(dynamixel_config_t *configMotor, protocol_config_t *configProtocol)
+NorseBot::NorseBot(HardwareSerial& commandPort, HardwareSerial& dynamixelPort, uint8_t directionPin)
+    : _commandPort(commandPort), _dynamixelPort(dynamixelPort)
 {
-    _motor = new Dynamixel(configMotor->txPin, configMotor->rxPin, configMotor->baudRate, configMotor->directionPin);
-    _protocol = new NorseProtocol(configProtocol->txPin, configProtocol->rxPin, configProtocol->baudRate);
-    _protocolThread = new Thread(osPriorityNormal, 4096UL, nullptr, "ProtocolThread");
+    _motor = new Dynamixel2Arduino(_dynamixelPort, directionPin);
+    _protocol = new NorseProtocol(_commandPort, 115200);
+
+    // _motor = new Dynamixel(configMotor->txPin, configMotor->rxPin, configMotor->baudRate, configMotor->directionPin);
+    // _protocol = new NorseProtocol(configProtocol->txPin, configProtocol->rxPin, configProtocol->baudRate);
+    // _protocolThread = new Thread(osPriorityNormal, 4096UL, nullptr, "ProtocolThread");
 } 
 
 NorseBot::~NorseBot()
@@ -14,13 +19,23 @@ NorseBot::~NorseBot()
 
 void NorseBot::init()
 {
+    _motor->begin(115200);
+    _protocol->begin();
+
     startEngine();
     readingThreadRunning = true;
-    _protocolThread->start(mbed::callback(protocolThread, this));
+    // _protocolThread->start(mbed::callback(protocolThread, this));
+    xTaskCreatePinnedToCore(this->protocolThread, "protocolTask", 16384, this, 1, &task, 1);
 
-    registerControlMode = NBOT_REG_CMDMODE_MANUAL;
-    registerModeManualCommand = PARAM_MOVING_ST;
-    registerModeManualSpeed = 0;
+    _norsebotConfig.lengthWheelToCenterX = 0.119;
+    _norsebotConfig.lengthWheelToCenterY = 0.119;
+    _norsebotConfig.wheelRadius = 0.03;
+
+    reset();
+    reset();
+
+    _targetPositionX = 0.5;
+    _targetPositionY = 0.5;
 }
 
 void NorseBot::protocolHandler()
@@ -28,9 +43,9 @@ void NorseBot::protocolHandler()
     switch (_rxPacket.eventId)
     {
         case EVENT_MOVING_CMD: 
-            registerModeManualCommand = _rxPacket.parameters[0];
-            registerModeManualSpeed = (((uint16_t)_rxPacket.parameters[2]) << 8) | (uint16_t)_rxPacket.parameters[1];
-            commandMovingHandler(); 
+            _norsebotStatus.currentManualCommand = _rxPacket.parameters[0];
+            _norsebotStatus.currentManualSpeed = (((uint16_t)_rxPacket.parameters[2]) << 8) | (uint16_t)_rxPacket.parameters[1];
+            commandMovingHandler();
             break;
         default: break;
     }
@@ -38,55 +53,59 @@ void NorseBot::protocolHandler()
 
 void NorseBot::commandMovingHandler()
 {
-    switch (registerControlMode)
+    switch (_norsebotStatus.controlMode)
     {
-        case NBOT_REG_CMDMODE_MANUAL: manualModeHandler(); break;
-        case NBOT_REG_CMDMODE_AUTO: break;
+        case CONTROL_MODE_MANUAL: manualModeHandler(); break;
+        case CONTROL_MODE_AUTO: break;
         default: break;
     }
 }
 
 void NorseBot::manualModeHandler()
 {
-    switch (registerModeManualCommand)
+    switch (_norsebotStatus.currentManualCommand)
     {
         case PARAM_MOVING_ST: stopMoving(); break;
-        case PARAM_MOVING_FW: moveForward(registerModeManualSpeed); break;
-        case PARAM_MOVING_BW: moveBackward(registerModeManualSpeed); break;
-        case PARAM_MOVING_SL: moveStraightLeft(registerModeManualSpeed); break;
-        case PARAM_MOVING_SR: moveStraightRight(registerModeManualSpeed); break;
-        case PARAM_MOVING_FL: moveForwardLeft(registerModeManualSpeed); break;
-        case PARAM_MOVING_FR: moveForwardRight(registerModeManualSpeed); break;
-        case PARAM_MOVING_BL: moveBackwardLeft(registerModeManualSpeed); break;
-        case PARAM_MOVING_BR: moveBackwardRight(registerModeManualSpeed); break;
-        case PARAM_MOVING_RL: moveRotateLeft(registerModeManualSpeed); break;
-        case PARAM_MOVING_RR: moveRotateRight(registerModeManualSpeed); break;
+        case PARAM_MOVING_FW: moveForward(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_BW: moveBackward(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_SL: moveStraightLeft(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_SR: moveStraightRight(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_FL: moveForwardLeft(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_FR: moveForwardRight(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_BL: moveBackwardLeft(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_BR: moveBackwardRight(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_RL: moveRotateLeft(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_RR: moveRotateRight(_norsebotStatus.currentManualSpeed); break;
         default: stopMoving(); break;
     }
 }
 
+void NorseBot::reset()
+{
+}
+
 void NorseBot::startEngine()
 {
-    _motor->enableLed(WHEEL_FRONT_RIGHT_ID);
-    _motor->enableLed(WHEEL_FRONT_LEFT_ID);
-    _motor->enableLed(WHEEL_REAR_LEFT_ID);
-    _motor->enableLed(WHEEL_REAR_RIGHT_ID);
-    _motor->enableTorque(WHEEL_FRONT_RIGHT_ID);
-    _motor->enableTorque(WHEEL_FRONT_LEFT_ID);
-    _motor->enableTorque(WHEEL_REAR_LEFT_ID);
-    _motor->enableTorque(WHEEL_REAR_RIGHT_ID);
+    _motor->ledOn(WHEEL_FRONT_RIGHT_ID);
+    _motor->ledOn(WHEEL_FRONT_LEFT_ID);
+    _motor->ledOn(WHEEL_REAR_LEFT_ID);
+    _motor->ledOn(WHEEL_REAR_RIGHT_ID);
+    _motor->torqueOn(WHEEL_FRONT_RIGHT_ID);
+    _motor->torqueOn(WHEEL_FRONT_LEFT_ID);
+    _motor->torqueOn(WHEEL_REAR_LEFT_ID);
+    _motor->torqueOn(WHEEL_REAR_RIGHT_ID);
 }
 
 void NorseBot::stopEngine()
 {
-    _motor->disableLed(WHEEL_FRONT_RIGHT_ID);
-    _motor->disableLed(WHEEL_FRONT_LEFT_ID);
-    _motor->disableLed(WHEEL_REAR_LEFT_ID);
-    _motor->disableLed(WHEEL_REAR_RIGHT_ID);
-    _motor->disableTorque(WHEEL_FRONT_RIGHT_ID);
-    _motor->disableTorque(WHEEL_FRONT_LEFT_ID);
-    _motor->disableTorque(WHEEL_REAR_LEFT_ID);
-    _motor->disableTorque(WHEEL_REAR_RIGHT_ID);
+    _motor->ledOff(WHEEL_FRONT_RIGHT_ID);
+    _motor->ledOff(WHEEL_FRONT_LEFT_ID);
+    _motor->ledOff(WHEEL_REAR_LEFT_ID);
+    _motor->ledOff(WHEEL_REAR_RIGHT_ID);
+    _motor->torqueOff(WHEEL_FRONT_RIGHT_ID);
+    _motor->torqueOff(WHEEL_FRONT_LEFT_ID);
+    _motor->torqueOff(WHEEL_REAR_LEFT_ID);
+    _motor->torqueOff(WHEEL_REAR_RIGHT_ID);
 }
 
 void NorseBot::stopMoving()
@@ -188,9 +207,8 @@ void NorseBot::moveRotateRight(uint16_t speed)
     _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, speed, MOTOR_DIRECTION_BACKWARD);
 }
 
-void NorseBot::protocolThread(void const *pvParamter)
+void NorseBot::protocolThread(void *pvParamter)
 {
-    // protocolThreadWorker();
     NorseBot *instance = (NorseBot*)pvParamter;
     instance->protocolThreadWorker();
 }
@@ -207,6 +225,22 @@ void NorseBot::protocolThreadWorker()
             _rxPacket = _protocol->getPacket();
             protocolHandler();
         }
-        ThisThread::sleep_for(1ms);
+        // vTaskDelay(100);
     }
 }
+
+// void NorseBot::protocolThreadWorker()
+// {
+//     printf("thread\r\n");
+//     while (readingThreadRunning)
+//     {
+//         _protocol->runCommunication();
+//         isPacketAvilable = _protocol->getIsPacketAvilable();
+//         if (isPacketAvilable)
+//         {
+//             _rxPacket = _protocol->getPacket();
+//             protocolHandler();
+//         }
+//         // ThisThread::sleep_for(1ms);
+//     }
+// }
