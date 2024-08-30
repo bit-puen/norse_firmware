@@ -1,7 +1,7 @@
 #ifndef PROTOCOL_CONFIG_H
 #define PROTOCOL_CONFIG_H
 
-#if PTC_MAJOR_VER == 1
+#if PTC_MAJOR_VER == 1 || PTC_MAJOR_VER == 2
 #define NUMBER_HEADER           2
 #define MAXIMUM_BUFFER_SIZE     12
 #define START_BYTE_1            0xFF
