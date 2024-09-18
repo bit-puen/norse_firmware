@@ -1,7 +1,6 @@
 #ifndef PROTOCOL_CONFIG_H
 #define PROTOCOL_CONFIG_H
 
-#if PTC_MAJOR_VER == 1 || PTC_MAJOR_VER == 2
 #define NUMBER_HEADER           2
 #define MAXIMUM_BUFFER_SIZE     12
 #define START_BYTE_1            0xFF
@@ -9,7 +8,13 @@
 #define STOP_BYTE_1             0x0D
 #define STOP_BYTE_2             0x0A
 #define EVENT_PING              0xA0
-#define EVENT_MOVING_CMD        0xA1
+#if PTC_MAJOR_VER == 1
+#define EVENT_DRIVING_MANUAL    0xA1
+#elif PTC_MAJOR_VER == 2
+#define EVENT_DRIVING_MODE      0xA1
+#define EVENT_DRIVING_MANUAL    0xA2
+#define EVENT_DRIVING_AUTO      0xA3
+#endif
 #define EVENT_REQUEST           0xB0
 #define EVENT_RESPONSE_OK       0x00
 #define EVENT_RESPONSE_DATA     0x01
@@ -19,6 +24,7 @@
 /* Error reason code */
 #define ERR_HEADER              0x00
 #define ERR_CHECKSUM            0x01
+#define ERR_PERMISSION          0x02
 
 #if PTC_MINOR_VER == 0
 #define PARAM_MOVING_ST         0x00
@@ -33,6 +39,4 @@
 #define PARAM_MOVING_BL         0X09
 #define PARAM_MOVING_BR         0X0A
 #endif
-#endif
-
 #endif

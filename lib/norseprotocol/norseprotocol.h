@@ -14,7 +14,7 @@ typedef struct
     uint8_t lineLength;
     uint8_t length;
     uint8_t eventId;
-    uint8_t parameters[4];
+    uint8_t parameters[16];
 } norse_packet_t;
 
 class NorseProtocol
