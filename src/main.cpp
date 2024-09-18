@@ -1,6 +1,9 @@
 #include "norsebot.h"
 #include "config/pin.h"
 #include "config/constant .h"
+#include "esp_log.h"
+
+static const char* TAG = "main_norsebot";
 
 // #include "norseprotocol.h"
 
@@ -43,28 +46,14 @@ NorseBot norseBot(commandSerial, dynamixelSerial, GPIO_NUM_4);
 
 void setup()
 {
+  ESP_LOGI(TAG, "Initial Norsebot");
   norseBot.init();
-  // testPTC.begin();
-  // xTaskCreatePinnedToCore(testThread, "protocolTask", 16384, NULL, 1, &task, 1);
+  delay(2000);
+  // norseBot.autoModeHandler();
 }
 void loop()
 {
-  // testPTC.runCommunication();
+  norseBot.updateControl();
+  norseBot.updatePosition();
   delay(100);
 }
-
-
-// void testThread(void *pvParamter)
-// {
-//   bool isPacketAvilable;
-//   printf("thread\r\n");
-//     while (true)
-//     {
-//         testPTC.runCommunication();
-//         isPacketAvilable = testPTC.getIsPacketAvilable();
-//         if (isPacketAvilable)
-//         {
-//           testPTC.respondOk(testPTC.getPacket().eventId);
-//         }
-//     }
-// }
