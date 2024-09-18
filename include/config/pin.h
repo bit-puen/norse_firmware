@@ -1,7 +1,7 @@
 #ifndef CONFIG_PIN_H
 #define CONFIG_PIN_H
 
-#ifdef MK_I
+#if defined(MK_I) || defined(MK_II)
 #define PIN_DYNAMIXEL_TX            PA_9
 #define PIN_DYNAMIXEL_RX            PA_10
 #define PIN_DYNAMIXEL_DIRECTION     PA_8
