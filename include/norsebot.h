@@ -1,7 +1,10 @@
 #ifndef NORSEBOT_H
 #define NORSEBOT_H
 
+// #include <esp_log.h>
+#include "norseutils.h"
 #include "config/pin.h"
+#include "config/constant .h"
 // #include "dynamixel.h"
 #include "norseprotocol.h"
 #include "Dynamixel2Arduino.h"
@@ -12,11 +15,14 @@
 #define WHEEL_REAR_LEFT_ID          3
 #define WHEEL_REAR_RIGHT_ID         4
 
-#define MOTOR_DIRECTION_FORWARD     0x00
-#define MOTOR_DIRECTION_BACKWARD    0x01
-#define CONTROL_MODE_MANUAL         0x00
-#define CONTROL_MODE_AUTO           0x01  
+// #define MOTOR_DIRECTION_FORWARD     0x00
+// #define MOTOR_DIRECTION_BACKWARD    0x01
+#define DRIVING_MODE_MANUAL         0x00
+#define DRIVING_MODE_AUTO           0x01
 
+#define TAG_PROTOCOL                "Protocol"
+#define TAG_DYNAMIXEL               "Dynamixel"
+#define TAG_AUTODRIVE               "AutoDrive"
 
 // typedef struct
 // {
@@ -43,14 +49,14 @@ typedef struct
 typedef struct
 {
     uint8_t controlMode;
-    int initialPositionFL;
-    int initialPositionFR;
-    int initialPositionRL;
-    int initialPositionRR;
-    int presentPositionFL;
-    int presentPositionFR;
-    int presentPositionRL;
-    int presentPositionRR;
+    float initialPositionFL;
+    float initialPositionFR;
+    float initialPositionRL;
+    float initialPositionRR;
+    float presentPositionFL;
+    float presentPositionFR;
+    float presentPositionRL;
+    float presentPositionRR;
     uint16_t currentManualSpeed;
     uint16_t currentManualCommand;
 } norsebot_status_t;
@@ -63,11 +69,11 @@ class NorseBot
 
         void init();
         void protocolHandler();
-        void commandMovingHandler();
-        void manualModeHandler();
-        // void autoModeHandler();
+        void updateControl();
+        void manualDriveHandler();
+        void autoDriveHandler();
+        void updatePosition();
 
-        // void updateMotorPosition();
         void reset();
         void initNorsebotStatus();
 
@@ -87,6 +93,8 @@ class NorseBot
         void moveRotateLeft(uint16_t speed);
         void moveRotateRight(uint16_t speed);
 
+        void velocityProfileSquare(float positioningVelocity, float trayMaxVelocity, float targetZone, float distanceX, float distanceY);
+
     private:
         // Dynamixel* _motor;
         NorseProtocol* _protocol;
@@ -103,19 +111,20 @@ class NorseBot
         volatile bool isPacketAvilable = false;
 
         // Odometry data
-        float _odometryPositionX, _odometryPositionY, _odometryPositionTheta;
+        float _odometryPositionX, _odometryPositionY, _odometryPhi;
+        float _fwkVelocityX, _fwkVelocityY, _fwkPhi;
         // Target data
-        float _targetPositionX, _targetPositionY, _targetPositionTheta;
-        float expectedVelocityX, expectedVelocityY, expectedOmegaZ;
+        float _targetPositionX, _targetPositionY, _targetPhi;
+        float expectedVelocityX, expectedVelocityY, expectedPhi;
 
         static void protocolThread(void *pvParamter);
         void protocolThreadWorker();
         // void protocolThreadWorker();
-        TaskHandle_t task;
+        TaskHandle_t taskProtocol;
 
-
-
-    // private:
+    private:
+        float _IkOrientationOld;
+        float _periodS;
     //     uint8_t registerControlMode;
     //     uint8_t registerModeManualCommand;
     //     uint16_t registerModeManualSpeed;
