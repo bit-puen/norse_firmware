@@ -106,6 +106,8 @@ void NorseBot::manualDriveHandler()
         case PARAM_MOVING_BR: moveBackwardRight(_norsebotStatus.currentManualSpeed); break;
         case PARAM_MOVING_RL: moveRotateLeft(_norsebotStatus.currentManualSpeed); break;
         case PARAM_MOVING_RR: moveRotateRight(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_AB_CW: moveAroundBendCw(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_AB_CCW: moveAroundBendCcw(_norsebotStatus.currentManualSpeed); break;
         default: break;
     }
     _norsebotStatus.currentManualCommand = 0xFF;
@@ -447,6 +449,28 @@ void NorseBot::moveRotateRight(uint16_t speed)
     _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, UNIT_RAW);
     _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, UNIT_RAW);
     _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, -speed, UNIT_RAW);
+}
+
+void NorseBot::moveAroundBendCw(uint16_t speed)
+{
+    if (_motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, 0, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, 0, UNIT_RAW))
+    {
+        _protocol->respondOk(EVENT_DRIVING_MANUAL);
+    }
+}
+
+void NorseBot::moveAroundBendCcw(uint16_t speed)
+{
+    if (_motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, 0, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, 0, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, speed, UNIT_RAW))
+    {
+        _protocol->respondOk(EVENT_DRIVING_MANUAL);
+    }
 }
 
 void NorseBot::velocityProfileSquare(float positioningVelocity, float trayMaxVelocity, float targetZone, float distanceX, float distanceY)

@@ -38,5 +38,7 @@
 #define PARAM_MOVING_FR         0X08
 #define PARAM_MOVING_BL         0X09
 #define PARAM_MOVING_BR         0X0A
+#define PARAM_MOVING_AB_CW      0X0B
+#define PARAM_MOVING_AB_CCW     0X0C
 #endif
 #endif

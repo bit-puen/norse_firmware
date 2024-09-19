@@ -92,6 +92,8 @@ class NorseBot
         void moveBackwardRight(uint16_t speed);
         void moveRotateLeft(uint16_t speed);
         void moveRotateRight(uint16_t speed);
+        void moveAroundBendCw(uint16_t speed);
+        void moveAroundBendCcw(uint16_t speed);
 
         void velocityProfileSquare(float positioningVelocity, float trayMaxVelocity, float targetZone, float distanceX, float distanceY);
 
