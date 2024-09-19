@@ -36,7 +36,7 @@ void NorseBot::init()
 
 void NorseBot::protocolHandler()
 {
-    float tarPosX, tarPosY, tarPosPhi;
+    float tarPosX, tarPosY, tarPhi;
     switch (_rxPacket.eventId)
     {
         case EVENT_DRIVING_MODE:
@@ -57,12 +57,25 @@ void NorseBot::protocolHandler()
                 _protocol->respondError(ERR_PERMISSION); 
                 break;
             }
-            _targetPositionX = float(BYTES2UINT16(_rxPacket.parameters[1], _rxPacket.parameters[0])) / 1000;
-            _targetPositionY = float(BYTES2UINT16(_rxPacket.parameters[3], _rxPacket.parameters[2])) / 1000;
+
+            
+            // _targetPositionX = float(BYTES2UINT16(_rxPacket.parameters[1], _rxPacket.parameters[0])) / 1000;
+            // _targetPositionY = float(BYTES2UINT16(_rxPacket.parameters[3], _rxPacket.parameters[2])) / 1000;
+            // _targetPhi = DEG2RAD(float(BYTES2INT16(_rxPacket.parameters[5], _rxPacket.parameters[4])));
+            // // // RotZ(-90) robot frame x-axis along world frame y-axis
+            // // _targetPositionX = (-1) * tarPosY;
+            // // _targetPositionY = tarPosX;
+
+            tarPosX = float(BYTES2UINT16(_rxPacket.parameters[1], _rxPacket.parameters[0])) / 1000;
+            tarPosY = float(BYTES2UINT16(_rxPacket.parameters[3], _rxPacket.parameters[2])) / 1000;
             _targetPhi = DEG2RAD(float(BYTES2INT16(_rxPacket.parameters[5], _rxPacket.parameters[4])));
-            // // RotZ(-90) robot frame x-axis along world frame y-axis
-            // _targetPositionX = (-1) * tarPosY;
-            // _targetPositionY = tarPosX;
+            // RotZ(-90) robot frame x-axis along world frame y-axis
+            if (_targetPhi > 0) tarPhi = (-1) * _targetPhi;
+            else                tarPhi = _targetPhi;
+            
+            _targetPositionX = (tarPosX * cos(tarPhi)) - (tarPosY * sin(tarPhi));
+            _targetPositionY = (tarPosX * sin(tarPhi)) + (tarPosY * cos(tarPhi));
+
             // ESP_LOGV(TAG_PROTOCOL, "TarX: %.2f \t TarY: %.2f \t TarPhi: %.2f", _targetPositionX, _targetPositionY, _targetPhi);
         default: break;
     }
