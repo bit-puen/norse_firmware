@@ -7,7 +7,10 @@ static const char* TAG = "main_norsebot";
 
 HardwareSerial commandSerial(0);
 HardwareSerial dynamixelSerial(1);
-NorseBot norseBot(commandSerial, dynamixelSerial, GPIO_NUM_4);
+NorseBot norseBot(commandSerial, 
+                  dynamixelSerial, 
+                  PIN_DYNAMIXEL_DIRECTION,
+                  PIN_OBSTACLE_DETECTION);
 
 void setup()
 {
@@ -19,5 +22,6 @@ void loop()
 {
   norseBot.updateControl();
   norseBot.updatePosition();
+  norseBot.updateObstacle();
   delay(100);
 }

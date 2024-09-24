@@ -10,10 +10,11 @@
 #define EVENT_PING              0xA0
 #if PTC_MAJOR_VER == 1
 #define EVENT_DRIVING_MANUAL    0xA1
-#elif PTC_MAJOR_VER == 2
+#elif PTC_MAJOR_VER >= 2
 #define EVENT_DRIVING_MODE      0xA1
 #define EVENT_DRIVING_MANUAL    0xA2
 #define EVENT_DRIVING_AUTO      0xA3
+#define EVENT_DRIVING_OVERRIDE  0xA4
 #endif
 #define EVENT_REQUEST           0xB0
 #define EVENT_RESPONSE_OK       0x00
@@ -25,8 +26,10 @@
 #define ERR_HEADER              0x00
 #define ERR_CHECKSUM            0x01
 #define ERR_PERMISSION          0x02
+#if PTC_MAJOR_VER >= 2 && PTC_MINOR_VER >=2
+#define ERR_OBSTABLE            0x03
+#endif
 
-#if PTC_MINOR_VER == 0
 #define PARAM_MOVING_ST         0x00
 #define PARAM_MOVING_FW         0x01
 #define PARAM_MOVING_BW         0x02
@@ -40,5 +43,5 @@
 #define PARAM_MOVING_BR         0X0A
 #define PARAM_MOVING_AB_CW      0X0B
 #define PARAM_MOVING_AB_CCW     0X0C
-#endif
+
 #endif

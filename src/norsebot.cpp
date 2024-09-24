@@ -2,11 +2,12 @@
 
 
 // NorseBot::NorseBot(dynamixel_config_t *configMotor, protocol_config_t *configProtocol)
-NorseBot::NorseBot(HardwareSerial& commandPort, HardwareSerial& dynamixelPort, uint8_t directionPin)
-    : _commandPort(commandPort), _dynamixelPort(dynamixelPort)
+NorseBot::NorseBot(HardwareSerial& commandPort, HardwareSerial& dynamixelPort, uint8_t directionPin, uint8_t obstaclePin)
+    : _commandPort(commandPort), _dynamixelPort(dynamixelPort), _obstaclePin(obstaclePin)
 {
     _motor = new Dynamixel2Arduino(_dynamixelPort, directionPin);
     _protocol = new NorseProtocol(_commandPort, 115200);
+    pinMode(_obstaclePin, INPUT);
 } 
 
 NorseBot::~NorseBot()
@@ -46,37 +47,45 @@ void NorseBot::protocolHandler()
             if (_norsebotStatus.controlMode != DRIVING_MODE_MANUAL) 
             {
                 _protocol->respondError(ERR_PERMISSION); 
-                break;
             }
-            _norsebotStatus.currentManualCommand = _rxPacket.parameters[0];
-            _norsebotStatus.currentManualSpeed = (((uint16_t)_rxPacket.parameters[2]) << 8) | (uint16_t)_rxPacket.parameters[1];
+            else
+            {
+                _norsebotStatus.currentManualCommand = _rxPacket.parameters[0];
+                _norsebotStatus.currentManualSpeed = BYTES2UINT16(_rxPacket.parameters[2], _rxPacket.parameters[1]);
+                // _norsebotStatus.currentManualSpeed = (((uint16_t)_rxPacket.parameters[2]) << 8) | (uint16_t)_rxPacket.parameters[1];
+            }
             break;
         case EVENT_DRIVING_AUTO:
             if (_norsebotStatus.controlMode != DRIVING_MODE_AUTO) 
             {
                 _protocol->respondError(ERR_PERMISSION); 
-                break;
+            }
+            else
+            {
+                tarPosX = float(BYTES2UINT16(_rxPacket.parameters[1], _rxPacket.parameters[0])) / 1000;
+                tarPosY = float(BYTES2UINT16(_rxPacket.parameters[3], _rxPacket.parameters[2])) / 1000;
+                _targetPhi = DEG2RAD(float(BYTES2INT16(_rxPacket.parameters[5], _rxPacket.parameters[4])));
+                // RotZ(-90) robot frame x-axis along world frame y-axis
+                if (_targetPhi > 0) tarPhi = (-1) * _targetPhi;
+                else                tarPhi = _targetPhi;
+                
+                _targetPositionX = (tarPosX * cos(tarPhi)) - (tarPosY * sin(tarPhi));
+                _targetPositionY = (tarPosX * sin(tarPhi)) + (tarPosY * cos(tarPhi));
             }
 
-            
-            // _targetPositionX = float(BYTES2UINT16(_rxPacket.parameters[1], _rxPacket.parameters[0])) / 1000;
-            // _targetPositionY = float(BYTES2UINT16(_rxPacket.parameters[3], _rxPacket.parameters[2])) / 1000;
-            // _targetPhi = DEG2RAD(float(BYTES2INT16(_rxPacket.parameters[5], _rxPacket.parameters[4])));
-            // // // RotZ(-90) robot frame x-axis along world frame y-axis
-            // // _targetPositionX = (-1) * tarPosY;
-            // // _targetPositionY = tarPosX;
-
-            tarPosX = float(BYTES2UINT16(_rxPacket.parameters[1], _rxPacket.parameters[0])) / 1000;
-            tarPosY = float(BYTES2UINT16(_rxPacket.parameters[3], _rxPacket.parameters[2])) / 1000;
-            _targetPhi = DEG2RAD(float(BYTES2INT16(_rxPacket.parameters[5], _rxPacket.parameters[4])));
-            // RotZ(-90) robot frame x-axis along world frame y-axis
-            if (_targetPhi > 0) tarPhi = (-1) * _targetPhi;
-            else                tarPhi = _targetPhi;
-            
-            _targetPositionX = (tarPosX * cos(tarPhi)) - (tarPosY * sin(tarPhi));
-            _targetPositionY = (tarPosX * sin(tarPhi)) + (tarPosY * cos(tarPhi));
-
             // ESP_LOGV(TAG_PROTOCOL, "TarX: %.2f \t TarY: %.2f \t TarPhi: %.2f", _targetPositionX, _targetPositionY, _targetPhi);
+        case EVENT_DRIVING_OVERRIDE:
+            if (_norsebotStatus.controlMode != DRIVING_MODE_OVERRIDE) 
+            {
+                _protocol->respondError(ERR_PERMISSION); 
+            }
+            else
+            {
+                _targetOmegaFR = BYTES2INT16(_rxPacket.parameters[1], _rxPacket.parameters[0]);
+                _targetOmegaFL = BYTES2INT16(_rxPacket.parameters[3], _rxPacket.parameters[2]);
+                _targetOmegaRL = BYTES2INT16(_rxPacket.parameters[5], _rxPacket.parameters[4]);
+                _targetOmegaRR = BYTES2INT16(_rxPacket.parameters[7], _rxPacket.parameters[6]);
+            }
         default: break;
     }
 }
@@ -85,8 +94,9 @@ void NorseBot::updateControl()
 {
     switch (_norsebotStatus.controlMode)
     {
-        case DRIVING_MODE_MANUAL: manualDriveHandler(); break;
-        case DRIVING_MODE_AUTO: autoDriveHandler();break;
+        case DRIVING_MODE_MANUAL:   manualDriveHandler(); break;
+        case DRIVING_MODE_AUTO:     autoDriveHandler(); break;
+        case DRIVING_MODE_OVERRIDE: overrideDriveHandler(); break;
         default: break;
     }
 }
@@ -120,7 +130,6 @@ void NorseBot::autoDriveHandler()
     float trayNearTarget = 0.01;  // m/s
     // float expectedVelocityX, expectedVelocityY, expectedOmegaZ;
     float distanceX, distanceY, alpha;
-    float omegaFL, omegaFR, omegaRL, omegaRR;
 
     distanceX = _targetPositionX - _odometryPositionX;
     distanceY = _targetPositionY - _odometryPositionY;
@@ -157,55 +166,46 @@ void NorseBot::autoDriveHandler()
         _IkOrientationOld = Ik;
         expectedPhi = Uk;
     }
-    
-
-    // // Check limit of motor
-    // if (expectedVelocityX > maxVelocity)
-    // {
-    //     expectedVelocityX = maxVelocity;
-    // }
-    // else if (expectedVelocityX < (-1) * maxVelocity)
-    // {
-    //    expectedVelocityX = (-1) * maxVelocity;
-    // }
-    
-    // if (expectedVelocityY > maxVelocity)
-    // {
-    //     expectedVelocityY = maxVelocity;
-    // }
-    // else if (expectedVelocityY < (-1) * maxVelocity)
-    // {
-    //    expectedVelocityY = (-1) * maxVelocity;
-    // }
 
     // ESP_LOGI(TAG_AUTODRIVE, "expectedVelocityX: %.2f || expectedVelocityY: %.2f || expectedPhi: %.2f", expectedVelocityX, expectedVelocityY, expectedPhi);
     
     /* Inverse kinematics */
-    omegaFR = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX + expectedVelocityY + (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
-    omegaFL = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX - expectedVelocityY - (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
-    omegaRL = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX + expectedVelocityY - (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
-    omegaRR = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX - expectedVelocityY + (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
+    _expectedOmegaFR = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX + expectedVelocityY + (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
+    _expectedOmegaFL = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX - expectedVelocityY - (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
+    _expectedOmegaRL = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX + expectedVelocityY - (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
+    _expectedOmegaRR = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX - expectedVelocityY + (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
 
-    omegaFR = RADPERSEC2RPM(omegaFR);
-    omegaFL = RADPERSEC2RPM(omegaFL);
-    omegaRL = RADPERSEC2RPM(omegaRL);
-    omegaRR = RADPERSEC2RPM(omegaRR);
+    _expectedOmegaFR = RADPERSEC2RPM(_expectedOmegaFR);
+    _expectedOmegaFL = RADPERSEC2RPM(_expectedOmegaFL);
+    _expectedOmegaRL = RADPERSEC2RPM(_expectedOmegaRL);
+    _expectedOmegaRR = RADPERSEC2RPM(_expectedOmegaRR);
 
-    // ESP_LOGI(TAG_AUTODRIVE, "omegaFR: %.2f \t omegaFL: %.2f \t omegaRL: %.2f \t omegaRR: %.2f", omegaFR, omegaFL, omegaRL, omegaRR);
+    // ESP_LOGI(TAG_AUTODRIVE, "omegaFR: %.2f \t omegaFL: %.2f \t omegaRL: %.2f \t omegaRR: %.2f", _expectedOmegaFR, _expectedOmegaFL, _expectedOmegaRL, _expectedOmegaRR);
 
-    if (omegaFR > MOTOR_MAX_RPM)                omegaFR = MOTOR_MAX_RPM;
-    else if (omegaFR < (-1) * MOTOR_MAX_RPM)    omegaFR = (-1) * MOTOR_MAX_RPM;
-    if (omegaFL > MOTOR_MAX_RPM)                omegaFL = MOTOR_MAX_RPM;
-    else if (omegaFL < (-1) * MOTOR_MAX_RPM)    omegaFL = (-1) * MOTOR_MAX_RPM;
-    if (omegaRL > MOTOR_MAX_RPM)                omegaRL = MOTOR_MAX_RPM;
-    else if (omegaRL < (-1) * MOTOR_MAX_RPM)    omegaRL = (-1) * MOTOR_MAX_RPM;
-    if (omegaRR > MOTOR_MAX_RPM)                omegaRR = MOTOR_MAX_RPM;
-    else if (omegaRR < (-1) * MOTOR_MAX_RPM)    omegaRR = (-1) * MOTOR_MAX_RPM;
+    if (_expectedOmegaFR > MOTOR_MAX_RPM)                _expectedOmegaFR = MOTOR_MAX_RPM;
+    else if (_expectedOmegaFR < (-1) * MOTOR_MAX_RPM)    _expectedOmegaFR = (-1) * MOTOR_MAX_RPM;
+    if (_expectedOmegaFL > MOTOR_MAX_RPM)                _expectedOmegaFL = MOTOR_MAX_RPM;
+    else if (_expectedOmegaFL < (-1) * MOTOR_MAX_RPM)    _expectedOmegaFL = (-1) * MOTOR_MAX_RPM;
+    if (_expectedOmegaRL > MOTOR_MAX_RPM)                _expectedOmegaRL = MOTOR_MAX_RPM;
+    else if (_expectedOmegaRL < (-1) * MOTOR_MAX_RPM)    _expectedOmegaRL = (-1) * MOTOR_MAX_RPM;
+    if (_expectedOmegaRR > MOTOR_MAX_RPM)                _expectedOmegaRR = MOTOR_MAX_RPM;
+    else if (_expectedOmegaRR < (-1) * MOTOR_MAX_RPM)    _expectedOmegaRR = (-1) * MOTOR_MAX_RPM;
 
-    _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, (int)omegaFR, UNIT_RPM);
-    _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, (int)omegaFL, UNIT_RPM);
-    _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, (int)omegaRL, UNIT_RPM);
-    _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID,(int)omegaRR, UNIT_RPM);
+    _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, (int)_expectedOmegaFR, UNIT_RPM);
+    _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, (int)_expectedOmegaFL, UNIT_RPM);
+    _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, (int)_expectedOmegaRL, UNIT_RPM);
+    _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID,(int)_expectedOmegaRR, UNIT_RPM);
+}
+
+void NorseBot::overrideDriveHandler()
+{
+    if (_motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, _targetOmegaFR, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, _targetOmegaFL, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, _targetOmegaRL, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, _targetOmegaRR, UNIT_RAW))
+    {
+        _protocol->respondOk(EVENT_DRIVING_OVERRIDE);
+    }
 }
 
 void NorseBot::updatePosition()
@@ -268,8 +268,19 @@ void NorseBot::updatePosition()
     //     _odometryPhi = (-1) * _odometryPhi;
     // }
     
-    ESP_LOGI(TAG_AUTODRIVE, "TarX: %.2f || TarY: %.2f || TarPhi: %.2f", _targetPositionX, _targetPositionY, _targetPhi);
-    ESP_LOGI(TAG_AUTODRIVE, "OdoX: %.2f || OdoY: %.2f || OdoPhi: %.2f", _odometryPositionX, _odometryPositionY, _odometryPhi);
+    ESP_LOGV(TAG_AUTODRIVE, "TarX: %.2f || TarY: %.2f || TarPhi: %.2f", _targetPositionX, _targetPositionY, _targetPhi);
+    ESP_LOGV(TAG_AUTODRIVE, "OdoX: %.2f || OdoY: %.2f || OdoPhi: %.2f", _odometryPositionX, _odometryPositionY, _odometryPhi);
+}
+
+void NorseBot::updateObstacle()
+{
+    uint8_t detection = 0;
+    detection = digitalRead(_obstaclePin);
+    if (detection)
+    {
+        _protocol->respondError(ERR_OBSTABLE);
+        ESP_LOGI(TAG_OBSTACLE, "Obstacle was detected!");
+    }
 }
 
 void NorseBot::reset()
@@ -355,19 +366,18 @@ void NorseBot::stopMoving()
     {
         _protocol->respondOk(EVENT_DRIVING_MANUAL);
     }
-    // _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, 0, UNIT_RAW);
-    // _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, 0, UNIT_RAW);
-    // _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, 0, UNIT_RAW);
-    // _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, 0, UNIT_RAW);
 }
 
 void NorseBot::moveForward(uint16_t speed)
 {
-    _protocol->respondOk(EVENT_DRIVING_MANUAL);
-    _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, UNIT_RAW);
-    _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, UNIT_RAW);
-    _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, UNIT_RAW);
-    _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, speed, UNIT_RAW);
+    if (_motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, speed, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, speed, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, speed, UNIT_RAW) &&
+        _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, speed, UNIT_RAW))
+    {
+        _protocol->respondOk(EVENT_DRIVING_MANUAL);
+    }
+
 }
 
 void NorseBot::moveBackward(uint16_t speed)

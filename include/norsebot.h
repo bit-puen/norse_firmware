@@ -19,10 +19,12 @@
 // #define MOTOR_DIRECTION_BACKWARD    0x01
 #define DRIVING_MODE_MANUAL         0x00
 #define DRIVING_MODE_AUTO           0x01
+#define DRIVING_MODE_OVERRIDE       0x02
 
 #define TAG_PROTOCOL                "Protocol"
 #define TAG_DYNAMIXEL               "Dynamixel"
 #define TAG_AUTODRIVE               "AutoDrive"
+#define TAG_OBSTACLE                "Obstacle"
 
 // typedef struct
 // {
@@ -64,15 +66,23 @@ typedef struct
 class NorseBot
 {
     public:
-        NorseBot(HardwareSerial& commandPort, HardwareSerial& dynamixelPort, uint8_t directionPin);
+        NorseBot(
+            HardwareSerial& commandPort, 
+            HardwareSerial& dynamixelPort, 
+            uint8_t directionPin,
+            uint8_t obstaclePin);
         ~NorseBot();
 
         void init();
         void protocolHandler();
-        void updateControl();
+
         void manualDriveHandler();
         void autoDriveHandler();
+        void overrideDriveHandler();
+
+        void updateControl();
         void updatePosition();
+        void updateObstacle();
 
         void reset();
         void initNorsebotStatus();
@@ -105,6 +115,8 @@ class NorseBot
         HardwareSerial& _dynamixelPort;
         Dynamixel2Arduino* _motor;
 
+        uint8_t _obstaclePin;
+
         norse_packet_t _rxPacket;
         norsebot_status_t _norsebotStatus;
         norsebot_config_t _norsebotConfig;
@@ -117,6 +129,8 @@ class NorseBot
         float _fwkVelocityX, _fwkVelocityY, _fwkPhi;
         // Target data
         float _targetPositionX, _targetPositionY, _targetPhi;
+        uint16_t _targetOmegaFR, _targetOmegaFL, _targetOmegaRL, _targetOmegaRR;
+        float _expectedOmegaFR, _expectedOmegaFL, _expectedOmegaRL, _expectedOmegaRR;
         float expectedVelocityX, expectedVelocityY, expectedPhi;
 
         static void protocolThread(void *pvParamter);
