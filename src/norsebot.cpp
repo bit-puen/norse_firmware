@@ -7,6 +7,7 @@ NorseBot::NorseBot(HardwareSerial& commandPort, HardwareSerial& dynamixelPort, u
 {
     _motor = new Dynamixel2Arduino(_dynamixelPort, directionPin);
     _protocol = new NorseProtocol(_commandPort, 115200);
+    _buildinLed = new Adafruit_NeoPixel(1, GPIO_NUM_38, NEO_GRB + NEO_KHZ800);
     pinMode(_obstaclePin, INPUT);
 } 
 
@@ -19,6 +20,8 @@ void NorseBot::init()
     _motor->begin(115200);
     _motor->setPortProtocolVersion(DYNAMIXEL_PROTOCOL_VERSION);
     _protocol->begin();
+    _buildinLed->begin();
+    _buildinLed->clear();
 
     readingThreadRunning = true;
     xTaskCreatePinnedToCore(this->protocolThread, "protocolTask", 2048, this, 1, &taskProtocol, 1);
@@ -278,9 +281,16 @@ void NorseBot::updateObstacle()
     detection = digitalRead(_obstaclePin);
     if (detection)
     {
+        // digitalWrite(PIN_NEOPIXEL, HIGH);
+        _buildinLed->setPixelColor(0, _buildinLed->Color(255, 0, 0));
         _protocol->respondError(ERR_OBSTABLE);
         ESP_LOGI(TAG_OBSTACLE, "Obstacle was detected!");
     }
+    else
+    {
+        _buildinLed->setPixelColor(0, _buildinLed->Color(0, 0, 0));
+    }
+    _buildinLed->show();
 }
 
 void NorseBot::reset()

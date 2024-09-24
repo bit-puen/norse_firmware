@@ -9,6 +9,7 @@
 #include "norseprotocol.h"
 #include "Dynamixel2Arduino.h"
 // #include "norsebotregister.h"
+#include <Adafruit_NeoPixel.h>
 
 #define WHEEL_FRONT_RIGHT_ID        1
 #define WHEEL_FRONT_LEFT_ID         2
@@ -114,8 +115,10 @@ class NorseBot
         HardwareSerial& _commandPort;
         HardwareSerial& _dynamixelPort;
         Dynamixel2Arduino* _motor;
+        Adafruit_NeoPixel* _buildinLed;
 
         uint8_t _obstaclePin;
+        // uint8_t BUILTIN_LED;
 
         norse_packet_t _rxPacket;
         norsebot_status_t _norsebotStatus;
