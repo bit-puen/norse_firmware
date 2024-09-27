@@ -18,10 +18,12 @@ void setup()
   norseBot.init();
   delay(2000);
 }
+
 void loop()
 {
   norseBot.updateControl();
   norseBot.updatePosition();
   norseBot.updateObstacle();
+  norseBot.updateTail();
   delay(100);
 }

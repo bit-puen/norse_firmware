@@ -7,6 +7,7 @@
 #define START_BYTE_2            0xFA
 #define STOP_BYTE_1             0x0D
 #define STOP_BYTE_2             0x0A
+/* Event */
 #define EVENT_PING              0xA0
 #if PTC_MAJOR_VER == 1
 #define EVENT_DRIVING_MANUAL    0xA1
@@ -15,21 +16,21 @@
 #define EVENT_DRIVING_MANUAL    0xA2
 #define EVENT_DRIVING_AUTO      0xA3
 #define EVENT_DRIVING_OVERRIDE  0xA4
+#define EVENT_TAIL_MANUAL       0xB1
 #endif
 #define EVENT_REQUEST           0xB0
 #define EVENT_RESPONSE_OK       0x00
 #define EVENT_RESPONSE_DATA     0x01
 #define EVENT_RESPONSE_ERROR    0xFF
-/* PARAMS */
-#define PARAM_PING              0xA0
-/* Error reason code */
-#define ERR_HEADER              0x00
-#define ERR_CHECKSUM            0x01
-#define ERR_PERMISSION          0x02
-#if PTC_MAJOR_VER >= 2 && PTC_MINOR_VER >=2
-#define ERR_OBSTABLE            0x03
-#endif
 
+/* PARAMS */
+// Ping
+#define PARAM_PING              0xA0
+// Driving mode
+#define PARAM_MANUAL_DRIVE_MODE 0x00
+#define PARAM_AUTO_DRIVE_MODE   0x01
+#define PARAM_OVERRIDE_MODE     0x02
+// Manual drive mode
 #define PARAM_MOVING_ST         0x00
 #define PARAM_MOVING_FW         0x01
 #define PARAM_MOVING_BW         0x02
@@ -43,5 +44,22 @@
 #define PARAM_MOVING_BR         0X0A
 #define PARAM_MOVING_AB_CW      0X0B
 #define PARAM_MOVING_AB_CCW     0X0C
+// Tail mode
+#define PARAM_TAIL_MANUAL       0x00
+// Tail manual mode
+#define PARAM_TAIL_ST           0x00
+#define PARAM_TAIL_LS           0x01
+#define PARAM_TAIL_HS           0x02
+
+/* Error reason code */
+#define ERR_HEADER              0x00
+#define ERR_CHECKSUM            0x01
+#define ERR_PERMISSION          0x02
+#if PTC_MAJOR_VER >= 2 && PTC_MINOR_VER >=2
+#define ERR_OBSTABLE            0x03
+#define ERR_MOTOR_CMD_FAIL      0x04
+#endif
+
+
 
 #endif

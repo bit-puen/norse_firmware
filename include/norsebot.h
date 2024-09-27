@@ -15,12 +15,13 @@
 #define WHEEL_FRONT_LEFT_ID         2
 #define WHEEL_REAR_LEFT_ID          3
 #define WHEEL_REAR_RIGHT_ID         4
+#define TAIL_ID                     5
 
 // #define MOTOR_DIRECTION_FORWARD     0x00
 // #define MOTOR_DIRECTION_BACKWARD    0x01
-#define DRIVING_MODE_MANUAL         0x00
-#define DRIVING_MODE_AUTO           0x01
-#define DRIVING_MODE_OVERRIDE       0x02
+// #define DRIVING_MODE_MANUAL         0x00
+// #define DRIVING_MODE_AUTO           0x01
+// #define DRIVING_MODE_OVERRIDE       0x02
 
 #define TAG_PROTOCOL                "Protocol"
 #define TAG_DYNAMIXEL               "Dynamixel"
@@ -52,6 +53,7 @@ typedef struct
 typedef struct
 {
     uint8_t controlMode;
+    uint8_t tailMode;
     float initialPositionFL;
     float initialPositionFR;
     float initialPositionRL;
@@ -60,6 +62,8 @@ typedef struct
     float presentPositionFR;
     float presentPositionRL;
     float presentPositionRR;
+    float tailPosition;
+    uint8_t tailManualCommand;
     uint16_t currentManualSpeed;
     uint16_t currentManualCommand;
 } norsebot_status_t;
@@ -81,9 +85,12 @@ class NorseBot
         void autoDriveHandler();
         void overrideDriveHandler();
 
+        void tailManualHandler();
+
         void updateControl();
         void updatePosition();
         void updateObstacle();
+        void updateTail();
 
         void reset();
         void initNorsebotStatus();
@@ -120,6 +127,8 @@ class NorseBot
         uint8_t _obstaclePin;
         // uint8_t BUILTIN_LED;
 
+        uint8_t tailState;
+
         norse_packet_t _rxPacket;
         norsebot_status_t _norsebotStatus;
         norsebot_config_t _norsebotConfig;
@@ -127,12 +136,14 @@ class NorseBot
         volatile bool readingThreadRunning = false;
         volatile bool isPacketAvilable = false;
 
+        volatile bool flagDrivingCommand = false;
+
         // Odometry data
         float _odometryPositionX, _odometryPositionY, _odometryPhi;
         float _fwkVelocityX, _fwkVelocityY, _fwkPhi;
         // Target data
         float _targetPositionX, _targetPositionY, _targetPhi;
-        uint16_t _targetOmegaFR, _targetOmegaFL, _targetOmegaRL, _targetOmegaRR;
+        int16_t _targetOmegaFR, _targetOmegaFL, _targetOmegaRL, _targetOmegaRR;
         float _expectedOmegaFR, _expectedOmegaFL, _expectedOmegaRL, _expectedOmegaRR;
         float expectedVelocityX, expectedVelocityY, expectedPhi;
 
