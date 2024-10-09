@@ -11,11 +11,11 @@
 // #include "norsebotregister.h"
 #include <Adafruit_NeoPixel.h>
 
-#define WHEEL_FRONT_RIGHT_ID        1
-#define WHEEL_FRONT_LEFT_ID         2
-#define WHEEL_REAR_LEFT_ID          3
-#define WHEEL_REAR_RIGHT_ID         4
-#define TAIL_ID                     5
+// #define WHEEL_FRONT_RIGHT_ID        1
+// #define WHEEL_FRONT_LEFT_ID         2
+// #define WHEEL_REAR_LEFT_ID          3
+// #define WHEEL_REAR_RIGHT_ID         4
+// #define TAIL_ID                     5
 
 // #define MOTOR_DIRECTION_FORWARD     0x00
 // #define MOTOR_DIRECTION_BACKWARD    0x01
@@ -45,15 +45,13 @@
 
 typedef struct
 {
-    float lengthWheelToCenterX;
-    float lengthWheelToCenterY;
-    float wheelRadius;
+    float lX;
+    float lY;
+    float r;
 } norsebot_config_t;
 
 typedef struct
 {
-    uint8_t controlMode;
-    uint8_t tailMode;
     float initialPositionFL;
     float initialPositionFR;
     float initialPositionRL;
@@ -62,11 +60,21 @@ typedef struct
     float presentPositionFR;
     float presentPositionRL;
     float presentPositionRR;
-    float tailPosition;
-    uint8_t tailManualCommand;
-    uint16_t currentManualSpeed;
-    uint16_t currentManualCommand;
+    uint8_t controlMode;
+    uint16_t manualSpeed;
+    uint16_t manualCommand;
 } norsebot_status_t;
+
+typedef struct
+{
+    uint8_t mode;
+    uint16_t range;
+    uint16_t lowSpeed;
+    uint16_t highSpeed;
+    uint8_t command;
+    uint16_t waggingPeriodMs;
+    float position;
+} norsebot_tail_status_t;
 
 class NorseBot
 {
@@ -78,27 +86,35 @@ class NorseBot
             uint8_t obstaclePin);
         ~NorseBot();
 
-        void init();
-        void protocolHandler();
-
-        void manualDriveHandler();
-        void autoDriveHandler();
-        void overrideDriveHandler();
-
-        void tailManualHandler();
+        void init(norsebot_config_t* norsebotConfig);
 
         void updateControl();
         void updatePosition();
         void updateObstacle();
         void updateTail();
 
-        void reset();
-        void initNorsebotStatus();
-
     private:
+        void manualDriveHandler();
+        void autoDriveHandler();
+        void overrideDriveHandler();
+
+        void tailPositionHandler();
+        void tailPotHandler();
+        
         void startEngine();
         void stopEngine();
 
+        void rebootHandler(uint8_t param);
+        bool rebootMotor();
+        void initNorsebotStatus();
+        void reboot();
+        
+        static void protocolThread(void *pvParamter);
+        void protocolThreadWorker();
+        void protocolHandler();
+
+    /* Manual drive */
+    private:
         void stopMoving();
         void moveForward(uint16_t speed);
         void moveBackward(uint16_t speed);
@@ -113,51 +129,47 @@ class NorseBot
         void moveAroundBendCw(uint16_t speed);
         void moveAroundBendCcw(uint16_t speed);
 
+    /* Auto drive */
+    private:
         void velocityProfileSquare(float positioningVelocity, float trayMaxVelocity, float targetZone, float distanceX, float distanceY);
 
     private:
-        // Dynamixel* _motor;
         NorseProtocol* _protocol;
-        // Thread* _protocolThread;
         HardwareSerial& _commandPort;
         HardwareSerial& _dynamixelPort;
         Dynamixel2Arduino* _motor;
         Adafruit_NeoPixel* _buildinLed;
+        TaskHandle_t taskProtocol;
 
         uint8_t _obstaclePin;
-        // uint8_t BUILTIN_LED;
-
         uint8_t tailState;
 
         norse_packet_t _rxPacket;
         norsebot_status_t _norsebotStatus;
-        norsebot_config_t _norsebotConfig;
+        norsebot_config_t* _norsebotConfig;
+        norsebot_tail_status_t _norsebotTailStatus;
 
         volatile bool readingThreadRunning = false;
         volatile bool isPacketAvilable = false;
-
         volatile bool flagDrivingCommand = false;
-
+        
+        uint32_t waggingPeriodTimmer = 0;
+        int16_t _targetOmegaFR, _targetOmegaFL, _targetOmegaRL, _targetOmegaRR;
+        
+    /* Auto drive */
+    private:
         // Odometry data
         float _odometryPositionX, _odometryPositionY, _odometryPhi;
         float _fwkVelocityX, _fwkVelocityY, _fwkPhi;
         // Target data
         float _targetPositionX, _targetPositionY, _targetPhi;
-        int16_t _targetOmegaFR, _targetOmegaFL, _targetOmegaRL, _targetOmegaRR;
+
         float _expectedOmegaFR, _expectedOmegaFL, _expectedOmegaRL, _expectedOmegaRR;
         float expectedVelocityX, expectedVelocityY, expectedPhi;
 
-        static void protocolThread(void *pvParamter);
-        void protocolThreadWorker();
-        // void protocolThreadWorker();
-        TaskHandle_t taskProtocol;
-
-    private:
         float _IkOrientationOld;
         float _periodS;
-    //     uint8_t registerControlMode;
-    //     uint8_t registerModeManualCommand;
-    //     uint16_t registerModeManualSpeed;
+
 };
 
 #endif

@@ -30,14 +30,14 @@
                         ----|GPIO11  GPIO47|
                         ----|GPIO12  GPIO21|x---USB_D+
                         ----|GPIO13  GPIO20|x---USB_D-
-                        ----|GPIO14  GPIO19|----PECTRAL_SENSOR_GPIO
+                        ----|GPIO14  GPIO19|
                             |5V0        GND|
                             |GND        GND|
                             ----------------
 */
 #ifdef MK_III
 #define PIN_DYNAMIXEL_DIRECTION     GPIO_NUM_4
-#define PIN_OBSTACLE_DETECTION      GPIO_NUM_5
+#define PIN_OBSTACLE_DETECTION      GPIO_NUM_6
 #endif
 
 #endif

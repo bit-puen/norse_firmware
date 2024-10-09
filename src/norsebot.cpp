@@ -16,7 +16,7 @@ NorseBot::~NorseBot()
 {
 }
 
-void NorseBot::init()
+void NorseBot::init(norsebot_config_t* norsebotConfig)
 {
     _motor->begin(115200);
     _motor->setPortProtocolVersion(DYNAMIXEL_PROTOCOL_VERSION);
@@ -27,26 +27,22 @@ void NorseBot::init()
     readingThreadRunning = true;
     xTaskCreatePinnedToCore(this->protocolThread, "protocolTask", 2048, this, 1, &taskProtocol, 1);
     
-    _norsebotConfig.lengthWheelToCenterX = 0.119;
-    _norsebotConfig.lengthWheelToCenterY = 0.119;
-    _norsebotConfig.wheelRadius = 0.03;
-    _norsebotStatus.tailMode = PARAM_TAIL_MANUAL;
-    _norsebotStatus.tailManualCommand = PARAM_TAIL_ST;
-    _norsebotStatus.tailPosition = 180;
+    _norsebotConfig = norsebotConfig;
+    // _norsebotConfig->lX = 0.119;
+    // _norsebotConfig->lY = 0.119;
+    // _norsebotConfig->r = 0.03;
 
-    _targetPositionX = 0.0;
-    _targetPositionY = 0.0;
-    _targetPhi = 0.0;
-    _periodS = 0.1;
-
-    reset();
+    reboot();
 }
 
 void NorseBot::protocolHandler()
 {
     float tarPosX, tarPosY, tarPhi;
+    uint16_t tempUint16Value;
+
     switch (_rxPacket.eventId)
     {
+        case EVENT_REBOOT: rebootHandler(_rxPacket.parameters[0]); break;
         case EVENT_DRIVING_MODE:
             _norsebotStatus.controlMode = _rxPacket.parameters[0];
             _protocol->respondOk(EVENT_DRIVING_MODE);
@@ -58,9 +54,8 @@ void NorseBot::protocolHandler()
             }
             else
             {
-                _norsebotStatus.currentManualCommand = _rxPacket.parameters[0];
-                _norsebotStatus.currentManualSpeed = BYTES2UINT16(_rxPacket.parameters[2], _rxPacket.parameters[1]);
-                // _norsebotStatus.currentManualSpeed = (((uint16_t)_rxPacket.parameters[2]) << 8) | (uint16_t)_rxPacket.parameters[1];
+                _norsebotStatus.manualCommand = _rxPacket.parameters[0];
+                _norsebotStatus.manualSpeed = BYTES2UINT16(_rxPacket.parameters[2], _rxPacket.parameters[1]);
             }
             break;
         case EVENT_DRIVING_AUTO:
@@ -97,9 +92,25 @@ void NorseBot::protocolHandler()
                 ESP_LOGV(TAG_PROTOCOL, "targetOmega: %d %d %d %d", _targetOmegaFR, _targetOmegaFL, _targetOmegaRL, _targetOmegaRR);
             }
             break;
-        case EVENT_TAIL_MANUAL:
-            _norsebotStatus.tailManualCommand = _rxPacket.parameters[0];
-            _protocol->respondOk(EVENT_TAIL_MANUAL);
+        case EVENT_TAIL_MODE:
+            _norsebotTailStatus.mode = _rxPacket.parameters[0];
+
+            if (_rxPacket.parameters[1] > 180) _protocol->respondError(ERR_PERMISSION); break;
+            _norsebotTailStatus.range = _rxPacket.parameters[1];
+
+            tempUint16Value = BYTES2UINT16(_rxPacket.parameters[3], _rxPacket.parameters[2]);
+            if (tempUint16Value > 885) _protocol->respondError(ERR_PERMISSION); break;
+            _norsebotTailStatus.lowSpeed = tempUint16Value;
+            
+            tempUint16Value = BYTES2UINT16(_rxPacket.parameters[5], _rxPacket.parameters[4]);
+            if (tempUint16Value > 885) _protocol->respondError(ERR_PERMISSION); break;
+            _norsebotTailStatus.highSpeed = tempUint16Value;
+
+            _protocol->respondOk(EVENT_TAIL_MODE);
+            break;
+        case EVENT_TAIL_CMD:
+            _norsebotTailStatus.command = _rxPacket.parameters[0];
+            _protocol->respondOk(EVENT_TAIL_CMD);
         default: break;
     }
 }
@@ -117,24 +128,24 @@ void NorseBot::updateControl()
 
 void NorseBot::manualDriveHandler()
 {
-    switch (_norsebotStatus.currentManualCommand)
+    switch (_norsebotStatus.manualCommand)
     {
         case PARAM_MOVING_ST: stopMoving(); break;
-        case PARAM_MOVING_FW: moveForward(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_BW: moveBackward(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_SL: moveStraightLeft(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_SR: moveStraightRight(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_FL: moveForwardLeft(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_FR: moveForwardRight(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_BL: moveBackwardLeft(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_BR: moveBackwardRight(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_RL: moveRotateLeft(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_RR: moveRotateRight(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_AB_CW: moveAroundBendCw(_norsebotStatus.currentManualSpeed); break;
-        case PARAM_MOVING_AB_CCW: moveAroundBendCcw(_norsebotStatus.currentManualSpeed); break;
+        case PARAM_MOVING_FW: moveForward(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_BW: moveBackward(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_SL: moveStraightLeft(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_SR: moveStraightRight(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_FL: moveForwardLeft(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_FR: moveForwardRight(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_BL: moveBackwardLeft(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_BR: moveBackwardRight(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_RL: moveRotateLeft(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_RR: moveRotateRight(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_AB_CW: moveAroundBendCw(_norsebotStatus.manualSpeed); break;
+        case PARAM_MOVING_AB_CCW: moveAroundBendCcw(_norsebotStatus.manualSpeed); break;
         default: break;
     }
-    _norsebotStatus.currentManualCommand = 0xFF;
+    _norsebotStatus.manualCommand = 0xFF;
 }
 
 void NorseBot::autoDriveHandler()
@@ -184,10 +195,10 @@ void NorseBot::autoDriveHandler()
     // ESP_LOGI(TAG_AUTODRIVE, "expectedVelocityX: %.2f || expectedVelocityY: %.2f || expectedPhi: %.2f", expectedVelocityX, expectedVelocityY, expectedPhi);
     
     /* Inverse kinematics */
-    _expectedOmegaFR = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX + expectedVelocityY + (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
-    _expectedOmegaFL = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX - expectedVelocityY - (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
-    _expectedOmegaRL = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX + expectedVelocityY - (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
-    _expectedOmegaRR = (1 / _norsebotConfig.wheelRadius) * (expectedVelocityX - expectedVelocityY + (expectedPhi * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
+    _expectedOmegaFR = (1 / _norsebotConfig->r) * (expectedVelocityX + expectedVelocityY + (expectedPhi * (_norsebotConfig->lX + _norsebotConfig->lY)));
+    _expectedOmegaFL = (1 / _norsebotConfig->r) * (expectedVelocityX - expectedVelocityY - (expectedPhi * (_norsebotConfig->lX + _norsebotConfig->lY)));
+    _expectedOmegaRL = (1 / _norsebotConfig->r) * (expectedVelocityX + expectedVelocityY - (expectedPhi * (_norsebotConfig->lX + _norsebotConfig->lY)));
+    _expectedOmegaRR = (1 / _norsebotConfig->r) * (expectedVelocityX - expectedVelocityY + (expectedPhi * (_norsebotConfig->lX + _norsebotConfig->lY)));
 
     _expectedOmegaFR = RADPERSEC2RPM(_expectedOmegaFR);
     _expectedOmegaFL = RADPERSEC2RPM(_expectedOmegaFL);
@@ -228,11 +239,6 @@ void NorseBot::overrideDriveHandler()
     }
 
     flagDrivingCommand = false;
-
-    // _motor->setGoalVelocity(WHEEL_FRONT_RIGHT_ID, _targetOmegaFR, UNIT_RAW);
-    // _motor->setGoalVelocity(WHEEL_FRONT_LEFT_ID, _targetOmegaFL, UNIT_RAW);
-    // _motor->setGoalVelocity(WHEEL_REAR_LEFT_ID, _targetOmegaRL, UNIT_RAW);
-    // _motor->setGoalVelocity(WHEEL_REAR_RIGHT_ID, _targetOmegaRR, UNIT_RAW);
 }
 
 void NorseBot::updatePosition()
@@ -264,17 +270,17 @@ void NorseBot::updatePosition()
                           DEG2RAD(presentPositionFL) +
                           DEG2RAD(presentPositionRL) + 
                           DEG2RAD(presentPositionRR)) * 
-                          (_norsebotConfig.wheelRadius / 4);
+                          (_norsebotConfig->r / 4);
     _odometryPositionY = (DEG2RAD(presentPositionFR) - 
                           DEG2RAD(presentPositionFL) +
                           DEG2RAD(presentPositionRL) - 
                           DEG2RAD(presentPositionRR)) * 
-                          (_norsebotConfig.wheelRadius / 4);
+                          (_norsebotConfig->r / 4);
     _odometryPhi =       (DEG2RAD(presentPositionFR) - 
                           DEG2RAD(presentPositionFL) -
                           DEG2RAD(presentPositionRL) + 
                           DEG2RAD(presentPositionRR)) * 
-                          (_norsebotConfig.wheelRadius / (4 * (_norsebotConfig.lengthWheelToCenterX + _norsebotConfig.lengthWheelToCenterY)));
+                          (_norsebotConfig->r / (4 * (_norsebotConfig->lX + _norsebotConfig->lY)));
 
     // float fwkVelocityX, fwkVelocityY, odometryPhi;
     // float omegaFR, omegaFL, omegaRL, omegaRR;
@@ -284,8 +290,8 @@ void NorseBot::updatePosition()
     // omegaRR = RPM2RADPERSEC(_motor->getPresentVelocity(WHEEL_REAR_RIGHT_ID, UNIT_RPM));
 
     // /* Forward kinematics */
-    // _fwkVelocityX = (_norsebotConfig.wheelRadius / 4) * (omegaFR + omegaFL + omegaRL + omegaRR);
-    // _fwkVelocityY = (_norsebotConfig.wheelRadius / 4) * (omegaFR - omegaFL + omegaRL - omegaRR);
+    // _fwkVelocityX = (_norsebotConfig->r / 4) * (omegaFR + omegaFL + omegaRL + omegaRR);
+    // _fwkVelocityY = (_norsebotConfig->r / 4) * (omegaFR - omegaFL + omegaRL - omegaRR);
     // // // RotZ(90) bc 0 along x-axis
     // _odometryPositionX = _odometryPositionX + (_fwkVelocityX * _periodS);
     // _odometryPositionY = _odometryPositionY + (_fwkVelocityY * _periodS); 
@@ -305,7 +311,6 @@ void NorseBot::updateObstacle()
     detection = digitalRead(_obstaclePin);
     if (detection)
     {
-        // digitalWrite(PIN_NEOPIXEL, HIGH);
         _buildinLed->setPixelColor(0, _buildinLed->Color(255, 0, 0));
         _protocol->respondError(ERR_OBSTABLE);
         ESP_LOGV(TAG_OBSTACLE, "Obstacle was detected!");
@@ -319,99 +324,177 @@ void NorseBot::updateObstacle()
 
 void NorseBot::updateTail()
 {
-    switch (_norsebotStatus.tailMode)
+    switch (_norsebotTailStatus.mode)
     {
-    case PARAM_TAIL_MANUAL: tailManualHandler(); break;
-    default: break;
+        case PARAM_TAIL_POS_CONTROL: tailPositionHandler(); break;
+        case PARAM_TAIL_POT_CONTROL: tailPotHandler();      break;
+        default: break;
     }
 }
 
-void NorseBot::tailManualHandler()
+void NorseBot::tailPositionHandler()
 {
     uint8_t isTailMoving = _motor->readControlTableItem(ControlTableItem::MOVING, TAIL_ID);
-    float tailPosition = _motor->getPresentPosition(TAIL_ID, UNIT_DEGREE); 
+    _norsebotTailStatus.position = _motor->getPresentPosition(TAIL_ID, UNIT_DEGREE); 
     uint16_t goalPwm = _motor->readControlTableItem(ControlTableItem::GOAL_PWM, TAIL_ID);
 
-    switch (_norsebotStatus.tailManualCommand)
+    switch (_norsebotTailStatus.command)
     {
     case PARAM_TAIL_ST:
-        if (!_motor->setGoalPosition(TAIL_ID, 180, UNIT_DEGREE)) _protocol->respondError(ERR_MOTOR_CMD_FAIL);
+        if (!_motor->setGoalPosition(TAIL_ID, DFT_TAIL_POSITION, UNIT_DEGREE)) _protocol->respondError(ERR_MOTOR_CMD_FAIL);
         break;
     case PARAM_TAIL_LS:
-        if (goalPwm == 885) _motor->setGoalPWM(TAIL_ID, 50, UNIT_PERCENT);
+        if (goalPwm == DFT_TAIL_HIGH_SPEED) _motor->setGoalPWM(TAIL_ID, DFT_TAIL_LOW_SPEED, UNIT_RAW);
         break;
     case PARAM_TAIL_HS:
-        if (goalPwm != 885) _motor->setGoalPWM(TAIL_ID, 100, UNIT_PERCENT);
+        if (goalPwm != DFT_TAIL_HIGH_SPEED) _motor->setGoalPWM(TAIL_ID, DFT_TAIL_HIGH_SPEED, UNIT_RAW);
         break;
     default:
         break;
     }
-    
-    if (isTailMoving == 0 && _norsebotStatus.tailManualCommand != PARAM_TAIL_ST) 
+
+    if (isTailMoving == 0 && _norsebotTailStatus.command != PARAM_TAIL_ST) 
     {
-        if (tailPosition >= 180)
+        if (_norsebotTailStatus.position >= DFT_TAIL_POSITION)
         {
-            _norsebotStatus.tailPosition = 135;
-            _motor->setGoalPosition(TAIL_ID, _norsebotStatus.tailPosition, UNIT_DEGREE);
+            _motor->setGoalPosition(TAIL_ID, DFT_TAIL_POSITION - _norsebotTailStatus.range, UNIT_DEGREE);
         }
         else
         {
-            _norsebotStatus.tailPosition = 225;
-            _motor->setGoalPosition(TAIL_ID, _norsebotStatus.tailPosition, UNIT_DEGREE);
+            _motor->setGoalPosition(TAIL_ID, DFT_TAIL_POSITION + _norsebotTailStatus.range, UNIT_DEGREE);
         }
     }
 }
 
-void NorseBot::reset()
+void NorseBot::tailPotHandler()
 {
-    initNorsebotStatus();
-    delay(500);
-    startEngine();
+    uint8_t isTailMoving = _motor->readControlTableItem(ControlTableItem::MOVING, TAIL_ID);
+    _norsebotTailStatus.position = _motor->getPresentPosition(TAIL_ID, UNIT_DEGREE); 
+    uint16_t goalPwm = _motor->readControlTableItem(ControlTableItem::GOAL_PWM, TAIL_ID);
+
+    switch (_norsebotTailStatus.command)
+    {
+    case PARAM_TAIL_ST:
+        if (!_motor->setGoalPosition(TAIL_ID, DFT_TAIL_POSITION, UNIT_DEGREE)) _protocol->respondError(ERR_MOTOR_CMD_FAIL);
+        break;
+    case PARAM_TAIL_LS:
+        if (goalPwm == DFT_TAIL_HIGH_SPEED) _motor->setGoalPWM(TAIL_ID, DFT_TAIL_LOW_SPEED, UNIT_RAW);
+        break;
+    case PARAM_TAIL_HS:
+        if (goalPwm != DFT_TAIL_HIGH_SPEED) _motor->setGoalPWM(TAIL_ID, DFT_TAIL_HIGH_SPEED, UNIT_RAW);
+        break;
+    default:
+        break;
+    }
+
+    if ((millis() - waggingPeriodTimmer > _norsebotTailStatus.waggingPeriodMs) && _norsebotTailStatus.command != PARAM_TAIL_ST) 
+    {
+        waggingPeriodTimmer = millis();
+        if (_norsebotTailStatus.position >= DFT_TAIL_POSITION)
+        {
+            _motor->setGoalPosition(TAIL_ID, DFT_TAIL_POSITION - _norsebotTailStatus.range, UNIT_DEGREE);
+        }
+        else
+        {
+            _motor->setGoalPosition(TAIL_ID, DFT_TAIL_POSITION + _norsebotTailStatus.range, UNIT_DEGREE);
+        }
+    }
 }
 
-void NorseBot::initNorsebotStatus()
+void NorseBot::rebootHandler(uint8_t param)
 {
-    // ping
-    // printf("Ping motor... \r\n");
-    for (size_t i = 1; i <= 4; i++)
+    switch (param)
+    {
+        case PARAM_REBOOT_MOTOR: rebootMotor();         break;
+        case PARAM_REBOOT_STAT: initNorsebotStatus();   break;
+        case PARAM_REBOOT_NBOT: reboot();               break;
+        default: break;
+    }
+}
+
+bool NorseBot::rebootMotor()
+{
+    for (size_t i = 1; i <= 5; i++)
     {
         while (true)
         {
             if (_motor->ping(i))
             {
-                ESP_LOGI(TAG_DYNAMIXEL, "ID %d: ping succeeded", i);
+                ESP_LOGI(TAG_DYNAMIXEL, "Dynamixel ID %d: ping succeeded", i);
                 break;
             }
         }
     }
     
-    _motor->reboot(WHEEL_FRONT_RIGHT_ID);
-    _motor->reboot(WHEEL_FRONT_LEFT_ID);
-    _motor->reboot(WHEEL_REAR_LEFT_ID);
-    _motor->reboot(WHEEL_REAR_RIGHT_ID);
-    _motor->reboot(TAIL_ID);
-    delay(100);
+    stopEngine();
+    for (size_t i = 0; i < 4; i++)
+    {
+        _motor->setOperatingMode(i, OP_VELOCITY);
+    }
+    _motor->setOperatingMode(TAIL_ID, OP_POSITION);
     
+    if (_motor->reboot(WHEEL_FRONT_RIGHT_ID) &&
+        _motor->reboot(WHEEL_FRONT_LEFT_ID) &&
+        _motor->reboot(WHEEL_REAR_LEFT_ID) &&
+        _motor->reboot(WHEEL_REAR_RIGHT_ID) &&
+        _motor->reboot(TAIL_ID))
+    {
+        vTaskDelay(200);
+        startEngine();
+        _protocol->respondOk(EVENT_REBOOT);
+        return true;
+    }
+    else
+    {
+        _protocol->respondError(ERR_MOTOR_CMD_FAIL);
+        return false;
+    }
+    
+}
+
+void NorseBot::initNorsebotStatus()
+{
+    /* Set default status*/
+    _targetPositionX = 0.0;
+    _targetPositionY = 0.0;
+    _targetPhi = 0.0;
+    _periodS = 0.1;
+    _odometryPositionX = 0; 
+    _odometryPositionY = 0;
+    _odometryPhi = 0;
+
     _norsebotStatus.initialPositionFL = _motor->getPresentPosition(WHEEL_FRONT_LEFT_ID, UNIT_DEGREE);
     _norsebotStatus.initialPositionFR = _motor->getPresentPosition(WHEEL_FRONT_RIGHT_ID, UNIT_DEGREE);
     _norsebotStatus.initialPositionRL = _motor->getPresentPosition(WHEEL_REAR_LEFT_ID, UNIT_DEGREE);
     _norsebotStatus.initialPositionRR = _motor->getPresentPosition(WHEEL_REAR_RIGHT_ID, UNIT_DEGREE);
-    _norsebotStatus.currentManualSpeed = 0;
-    _norsebotStatus.controlMode = PARAM_MANUAL_DRIVE_MODE;
-    _norsebotStatus.currentManualCommand = PARAM_MOVING_ST;
-
+    
     _norsebotStatus.presentPositionFL = 0;
     _norsebotStatus.presentPositionFR = 0;
     _norsebotStatus.presentPositionRL = 0;
     _norsebotStatus.presentPositionRR = 0;
 
-    _odometryPositionX = 0; 
-    _odometryPositionY = 0;
-    _odometryPhi = 0;
+    _norsebotStatus.controlMode = DFT_CONTROL_MODE;
+    _norsebotStatus.manualSpeed = DFT_MANUAL_SPEED;
+    _norsebotStatus.manualCommand = DFT_MANUAL_CMD;
+
+    _norsebotTailStatus.mode = DFT_TAIL_MODE;
+    _norsebotTailStatus.range = DFT_TAIL_RANGE;
+    _norsebotTailStatus.lowSpeed = DFT_TAIL_LOW_SPEED;
+    _norsebotTailStatus.highSpeed = DFT_TAIL_HIGH_SPEED;
+    _norsebotTailStatus.command = DFT_TAIL_COMMAND;
+    _norsebotTailStatus.position = DFT_TAIL_POSITION;
+
     ESP_LOGI(TAG_DYNAMIXEL, "Initial motor position:\t %.2f\t%.2f\t%.2f\t%.2f\t",   _norsebotStatus.initialPositionFR,
                                                                                     _norsebotStatus.initialPositionFL,
                                                                                     _norsebotStatus.initialPositionRL,
                                                                                     _norsebotStatus.initialPositionRR);
+}
+
+void NorseBot::reboot()
+{
+    rebootMotor();
+    initNorsebotStatus();
+    delay(500);
 }
 
 void NorseBot::startEngine()

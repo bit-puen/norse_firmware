@@ -5,6 +5,13 @@
 
 static const char* TAG = "main_norsebot";
 
+norsebot_config_t norsebotConfig
+{
+  LEN_WHEEL_CENTER_X,
+  LEN_WHEEL_CENTER_Y,
+  WHEEL_RADIUS
+};
+
 HardwareSerial commandSerial(0);
 HardwareSerial dynamixelSerial(1);
 NorseBot norseBot(commandSerial, 
@@ -15,7 +22,7 @@ NorseBot norseBot(commandSerial,
 void setup()
 {
   ESP_LOGI(TAG, "Initial Norsebot");
-  norseBot.init();
+  norseBot.init(&norsebotConfig);
   delay(2000);
 }
 
