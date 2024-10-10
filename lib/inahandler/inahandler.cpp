@@ -19,7 +19,7 @@ void InaHandler::begin(uint8_t i2cAddress)
     ESP_LOGI(TAG_INA, "Found INA219 chip");
 }
 
-float InaHandler::getVoltage()
+uint16_t InaHandler::getVoltageMv()
 {
     float shuntvoltage = 0;
     float busvoltage = 0;
@@ -31,6 +31,6 @@ float InaHandler::getVoltage()
     busvoltage = _ina->getBusVoltage_V();
     current_mA = _ina->getCurrent_mA();
     power_mW = _ina->getPower_mW();
-    loadvoltage = busvoltage + (shuntvoltage / 1000);
-    return loadvoltage;
+    loadvoltage = (busvoltage * 1000) + shuntvoltage;
+    return (uint16_t)loadvoltage;
 }

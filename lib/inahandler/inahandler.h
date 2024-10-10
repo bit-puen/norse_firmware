@@ -15,7 +15,7 @@ class InaHandler
         ~InaHandler();
 
         void begin(uint8_t i2cAddress);
-        float getVoltage();
+        uint16_t getVoltageMv();
 
     private:
         Adafruit_INA219* _ina;
