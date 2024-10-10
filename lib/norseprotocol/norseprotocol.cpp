@@ -51,6 +51,18 @@ void NorseProtocol::respondError(uint8_t reasonCode)
     write();
 }
 
+void NorseProtocol::respondData(uint8_t dataRegister, uint8_t* dataList, uint8_t dataBytes)
+{
+    uint8_t data[dataBytes + 1];
+    for (size_t i = 1; i < (dataBytes+1); i++)
+    {
+        if (i == 0) data[i] = dataRegister;
+        else        data[i] = dataList[i-1];
+    }
+    generatePacket(EVENT_RESPONSE_DATA, data, dataBytes+1);
+    write();
+}
+
 void NorseProtocol::respondOk(uint8_t eventId)
 {
     uint8_t data[] = {eventId};

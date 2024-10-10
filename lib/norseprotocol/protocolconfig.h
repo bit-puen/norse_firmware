@@ -57,6 +57,8 @@
 #define PARAM_TAIL_ST           0x00
 #define PARAM_TAIL_LS           0x01
 #define PARAM_TAIL_HS           0x02
+//
+#define DATA_REG_BATT           0x01
 /* Error reason code */
 #define ERR_HEADER              0x00
 #define ERR_CHECKSUM            0x01

@@ -5,43 +5,16 @@
 #include "norseutils.h"
 #include "config/pin.h"
 #include "config/constant .h"
-// #include "dynamixel.h"
 #include "norseprotocol.h"
 #include "Dynamixel2Arduino.h"
-// #include "norsebotregister.h"
+#include "inahandler.h"
 #include <Adafruit_NeoPixel.h>
-
-// #define WHEEL_FRONT_RIGHT_ID        1
-// #define WHEEL_FRONT_LEFT_ID         2
-// #define WHEEL_REAR_LEFT_ID          3
-// #define WHEEL_REAR_RIGHT_ID         4
-// #define TAIL_ID                     5
-
-// #define MOTOR_DIRECTION_FORWARD     0x00
-// #define MOTOR_DIRECTION_BACKWARD    0x01
-// #define DRIVING_MODE_MANUAL         0x00
-// #define DRIVING_MODE_AUTO           0x01
-// #define DRIVING_MODE_OVERRIDE       0x02
 
 #define TAG_PROTOCOL                "Protocol"
 #define TAG_DYNAMIXEL               "Dynamixel"
 #define TAG_AUTODRIVE               "AutoDrive"
 #define TAG_OBSTACLE                "Obstacle"
-
-// typedef struct
-// {
-//     PinName txPin;
-//     PinName rxPin;
-//     PinName directionPin;
-//     uint32_t baudRate;
-// } dynamixel_config_t;
-
-// typedef struct
-// {
-//     PinName txPin;
-//     PinName rxPin;
-//     uint32_t baudRate;
-// } protocol_config_t;
+#define TAG_BATTERY                 "Battery"
 
 typedef struct
 {
@@ -88,30 +61,39 @@ class NorseBot
 
         void init(norsebot_config_t* norsebotConfig);
 
+        void updateBatteryLife();
         void updateControl();
         void updatePosition();
         void updateObstacle();
         void updateTail();
 
     private:
+        //Drive
         void manualDriveHandler();
         void autoDriveHandler();
         void overrideDriveHandler();
 
+        // Tail
         void tailPositionHandler();
         void tailPotHandler();
         
+        // Motor
         void startEngine();
         void stopEngine();
 
+        // Other
         void rebootHandler(uint8_t param);
         bool rebootMotor();
-        void initNorsebotStatus();
         void reboot();
         
+        // Norse bot
+        void initNorsebotStatus();
+
+        // Norse protocol
         static void protocolThread(void *pvParamter);
         void protocolThreadWorker();
         void protocolHandler();
+        void respondDataHandler(uint8_t dataRegister);
 
     /* Manual drive */
     private:
@@ -140,6 +122,7 @@ class NorseBot
         Dynamixel2Arduino* _motor;
         Adafruit_NeoPixel* _buildinLed;
         TaskHandle_t taskProtocol;
+        InaHandler* _ina;
 
         uint8_t _obstaclePin;
         uint8_t tailState;
@@ -155,7 +138,7 @@ class NorseBot
         
         uint32_t waggingPeriodTimmer = 0;
         int16_t _targetOmegaFR, _targetOmegaFL, _targetOmegaRL, _targetOmegaRR;
-        
+        uint16_t batteryVoltage;
     /* Auto drive */
     private:
         // Odometry data

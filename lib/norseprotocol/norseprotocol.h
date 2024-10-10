@@ -33,6 +33,7 @@ class NorseProtocol
         void runCommunication();
 
         void respondError(uint8_t reasonCode);
+        void respondData(uint8_t dataRegister, uint8_t* data, uint8_t dataBytes);
         void respondOk(uint8_t eventId);
 
     private:
@@ -59,14 +60,14 @@ class NorseProtocol
 
         void read();
         void write();
-        void generatePacket(uint8_t eventId, uint8_t *params, uint8_t bytesParams);
-        bool validateChecksum(uint8_t *packet, uint8_t bytes);
+        void generatePacket(uint8_t eventId, uint8_t* params, uint8_t bytesParams);
+        bool validateChecksum(uint8_t* packet, uint8_t bytes);
         bool validateHeader(); 
-        uint16_t calculateChecksum(uint8_t *packet, uint8_t bytes);
+        uint16_t calculateChecksum(uint8_t* packet, uint8_t bytes);
         void eventHandler();
         
         #if PTC_MAJOR_VER == 1
-        FileHandle *mbed_override_console(int fd);
+        FileHandle* mbed_override_console(int fd);
         #endif
         
 };

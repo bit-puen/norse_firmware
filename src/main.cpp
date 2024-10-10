@@ -28,6 +28,7 @@ void setup()
 
 void loop()
 {
+  norseBot.updateBatteryLife();
   norseBot.updateControl();
   norseBot.updatePosition();
   norseBot.updateObstacle();
